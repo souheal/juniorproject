@@ -6,14 +6,11 @@ import 'package:image_picker/image_picker.dart';
 import 'home_screen.dart';
 
 enum AuthMode { signIn, signUp }
+
 enum _ImageAction { camera, gallery, remove }
 
 class AuthScreen extends StatefulWidget {
-  const AuthScreen({
-    super.key,
-    this.onBackRequested,
-    this.onCompleted,
-  });
+  const AuthScreen({super.key, this.onBackRequested, this.onCompleted});
 
   final void Function(BuildContext context)? onBackRequested;
   final void Function(BuildContext context)? onCompleted;
@@ -33,9 +30,41 @@ class _AuthScreenState extends State<AuthScreen> {
       TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
 
+  static const List<String> _syrianCities = [
+    'Damascus',
+    'Aleppo',
+    'Homs',
+    'Hama',
+    'Latakia',
+    'Tartus',
+    'Deir ez-Zor',
+    'Raqqa',
+    'Hasakah',
+    'Daraa',
+    'As-Suwayda',
+    'Idlib',
+    'Qamishli',
+    'Palmyra',
+  ];
+
+  static const List<String> _categories = [
+    'Information Technology',
+    'Doctor',
+    'Engineering',
+    'Education',
+    'Finance & Accounting',
+    'Media & Marketing',
+    'Hospitality',
+    'Construction',
+    'Student',
+    'Other',
+  ];
+
   AuthMode _mode = AuthMode.signIn;
   bool _isSubmitting = false;
   Uint8List? _profileImageBytes;
+  String? _selectedCity;
+  String? _selectedCategory;
 
   @override
   void dispose() {
@@ -51,7 +80,13 @@ class _AuthScreenState extends State<AuthScreen> {
     if (_mode == mode) {
       return;
     }
-    setState(() => _mode = mode);
+    setState(() {
+      _mode = mode;
+      if (mode == AuthMode.signIn) {
+        _selectedCity = null;
+        _selectedCategory = null;
+      }
+    });
   }
 
   void _handleBack() {
@@ -80,8 +115,8 @@ class _AuthScreenState extends State<AuthScreen> {
                 Text(
                   'Profile photo',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 FilledButton.icon(
@@ -121,8 +156,9 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
 
-    final source =
-        action == _ImageAction.camera ? ImageSource.camera : ImageSource.gallery;
+    final source = action == _ImageAction.camera
+        ? ImageSource.camera
+        : ImageSource.gallery;
     await _pickImage(source);
   }
 
@@ -174,9 +210,7 @@ class _AuthScreenState extends State<AuthScreen> {
     }
 
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(
-        builder: (_) => const HomeScreen(),
-      ),
+      MaterialPageRoute<void>(builder: (_) => const HomeScreen()),
     );
   }
 
@@ -188,9 +222,7 @@ class _AuthScreenState extends State<AuthScreen> {
     }
 
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(
-        builder: (_) => const HomeScreen(),
-      ),
+      MaterialPageRoute<void>(builder: (_) => const HomeScreen()),
     );
   }
 
@@ -255,6 +287,26 @@ class _AuthScreenState extends State<AuthScreen> {
     return null;
   }
 
+  String? _validateCity(String? value) {
+    if (_mode != AuthMode.signUp) {
+      return null;
+    }
+    if (value == null || value.isEmpty) {
+      return 'Please choose your city';
+    }
+    return null;
+  }
+
+  String? _validateCategory(String? value) {
+    if (_mode != AuthMode.signUp) {
+      return null;
+    }
+    if (value == null || value.isEmpty) {
+      return 'Please select a category';
+    }
+    return null;
+  }
+
   InputDecoration _fieldDecoration({
     required String label,
     required IconData icon,
@@ -300,215 +352,281 @@ class _AuthScreenState extends State<AuthScreen> {
         body: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back_rounded),
-                  onPressed: _handleBack,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  _mode == AuthMode.signIn
-                      ? 'Welcome back'
-                      : 'Create an account',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _mode == AuthMode.signIn
-                      ? 'Sign in to continue planning amazing events.'
-                      : 'Join us to discover events, track RSVPs, and more.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: const Color(0xFF707070),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 22,
-                      vertical: 24,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 820),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
+                    Text(
+                      _mode == AuthMode.signIn
+                          ? 'Welcome back'
+                          : 'Create an account',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _ModeToggle(
-                          mode: _mode,
-                          onChanged: _switchMode,
+                    const SizedBox(height: 8),
+                    Text(
+                      _mode == AuthMode.signIn
+                          ? 'Sign in to continue planning amazing events.'
+                          : 'Join us to discover events, track RSVPs, and more.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF707070),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Card(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 20,
                         ),
-                        const SizedBox(height: 24),
-                        Form(
-                          key: _formKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              if (_mode == AuthMode.signUp) ...[
-                                Row(
-                                  children: [
-                                    GestureDetector(
-                                      onTap: _showImageSourceActionSheet,
-                                      child: CircleAvatar(
-                                        radius: 36,
-                                        backgroundColor:
-                                            const Color(0xFF6A62FF),
-                                        backgroundImage: _profileImageBytes ==
-                                                null
-                                            ? null
-                                            : MemoryImage(_profileImageBytes!),
-                                        child: _profileImageBytes == null
-                                            ? const Icon(
-                                                Icons.add_a_photo_outlined,
-                                                color: Colors.white,
-                                              )
-                                            : null,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Text(
-                                        'Add a profile photo so friends can find you.',
-                                        style:
-                                            theme.textTheme.bodyMedium?.copyWith(
-                                          color: const Color(0xFF606060),
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 20),
-                                TextFormField(
-                                  controller: _nameController,
-                                  textCapitalization:
-                                      TextCapitalization.words,
-                                  decoration: _fieldDecoration(
-                                    label: 'Full name',
-                                    icon: Icons.person_outline,
-                                  ),
-                                  validator: _validateName,
-                                ),
-                                const SizedBox(height: 16),
-                                TextFormField(
-                                  controller: _phoneController,
-                                  keyboardType: TextInputType.phone,
-                                  autofillHints: const [
-                                    AutofillHints.telephoneNumber,
-                                  ],
-                                  decoration: _fieldDecoration(
-                                    label: 'Phone number',
-                                    icon: Icons.call_outlined,
-                                  ),
-                                  validator: _validatePhone,
-                                ),
-                                const SizedBox(height: 16),
-                              ],
-                              TextFormField(
-                                controller: _emailController,
-                                keyboardType: TextInputType.emailAddress,
-                                autofillHints: const [AutofillHints.email],
-                                decoration: _fieldDecoration(
-                                  label: 'Email address',
-                                  icon: Icons.mail_outline,
-                                ),
-                                validator: _validateEmail,
-                              ),
-                              const SizedBox(height: 16),
-                              TextFormField(
-                                controller: _passwordController,
-                                obscureText: true,
-                                autofillHints: const [AutofillHints.password],
-                                decoration: _fieldDecoration(
-                                  label: 'Password',
-                                  icon: Icons.lock_outline,
-                                ),
-                                validator: _validatePassword,
-                              ),
-                              if (_mode == AuthMode.signUp) ...[
-                                const SizedBox(height: 16),
-                                TextFormField(
-                                  controller: _confirmPasswordController,
-                                  obscureText: true,
-                                  decoration: _fieldDecoration(
-                                    label: 'Confirm password',
-                                    icon: Icons.lock_reset_outlined,
-                                  ),
-                                  validator: _validateConfirmPassword,
-                                ),
-                              ],
-                              if (_mode == AuthMode.signIn) ...[
-                                const SizedBox(height: 12),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: TextButton(
-                                    onPressed: () {},
-                                    style: TextButton.styleFrom(
-                                      padding: EdgeInsets.zero,
-                                      foregroundColor:
-                                          const Color(0xFF6A62FF),
-                                    ),
-                                    child: const Text('Forgot password?'),
-                                  ),
-                                ),
-                              ],
-                              const SizedBox(height: 24),
-                              _PrimaryButton(
-                                onPressed: _isSubmitting ? null : _submit,
-                                child: _isSubmitting
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(
-                                            Colors.white,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _ModeToggle(mode: _mode, onChanged: _switchMode),
+                            const SizedBox(height: 24),
+                            Form(
+                              key: _formKey,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  if (_mode == AuthMode.signUp) ...[
+                                    Row(
+                                      children: [
+                                        GestureDetector(
+                                          onTap: _showImageSourceActionSheet,
+                                          child: CircleAvatar(
+                                            radius: 36,
+                                            backgroundColor: const Color(
+                                              0xFF6A62FF,
+                                            ),
+                                            backgroundImage:
+                                                _profileImageBytes == null
+                                                ? null
+                                                : MemoryImage(
+                                                    _profileImageBytes!,
+                                                  ),
+                                            child: _profileImageBytes == null
+                                                ? const Icon(
+                                                    Icons.add_a_photo_outlined,
+                                                    color: Colors.white,
+                                                  )
+                                                : null,
                                           ),
                                         ),
-                                      )
-                                    : Text(
-                                        _mode == AuthMode.signIn
-                                            ? 'Sign in'
-                                            : 'Create account',
+                                        const SizedBox(width: 16),
+                                        Expanded(
+                                          child: Text(
+                                            'Add a profile photo so friends can find you.',
+                                            style: theme.textTheme.bodyMedium
+                                                ?.copyWith(
+                                                  color: const Color(
+                                                    0xFF606060,
+                                                  ),
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 20),
+                                    TextFormField(
+                                      controller: _nameController,
+                                      textCapitalization:
+                                          TextCapitalization.words,
+                                      decoration: _fieldDecoration(
+                                        label: 'Full name',
+                                        icon: Icons.person_outline,
                                       ),
+                                      validator: _validateName,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    TextFormField(
+                                      controller: _phoneController,
+                                      keyboardType: TextInputType.phone,
+                                      autofillHints: const [
+                                        AutofillHints.telephoneNumber,
+                                      ],
+                                      decoration: _fieldDecoration(
+                                        label: 'Phone number',
+                                        icon: Icons.call_outlined,
+                                      ),
+                                      validator: _validatePhone,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child:
+                                              DropdownButtonFormField<String>(
+                                                isExpanded: true,
+                                                value: _selectedCity,
+                                                items: _syrianCities
+                                                    .map(
+                                                      (city) =>
+                                                          DropdownMenuItem(
+                                                            value: city,
+                                                            child: Text(city),
+                                                          ),
+                                                    )
+                                                    .toList(),
+                                                decoration: _fieldDecoration(
+                                                  label: 'City',
+                                                  icon: Icons
+                                                      .location_city_outlined,
+                                                ),
+                                                onChanged: (value) => setState(
+                                                  () => _selectedCity = value,
+                                                ),
+                                                validator: _validateCity,
+                                              ),
+                                        ),
+                                        const SizedBox(width: 16),
+                                        Expanded(
+                                          child:
+                                              DropdownButtonFormField<String>(
+                                                isExpanded: true,
+                                                value: _selectedCategory,
+                                                items: _categories
+                                                    .map(
+                                                      (category) =>
+                                                          DropdownMenuItem(
+                                                            value: category,
+                                                            child: Text(
+                                                              category,
+                                                            ),
+                                                          ),
+                                                    )
+                                                    .toList(),
+                                                decoration: _fieldDecoration(
+                                                  label: 'Category',
+                                                  icon: Icons.work_outline,
+                                                ),
+                                                onChanged: (value) => setState(
+                                                  () =>
+                                                      _selectedCategory = value,
+                                                ),
+                                                validator: _validateCategory,
+                                              ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 16),
+                                  ],
+                                  TextFormField(
+                                    controller: _emailController,
+                                    keyboardType: TextInputType.emailAddress,
+                                    autofillHints: const [AutofillHints.email],
+                                    decoration: _fieldDecoration(
+                                      label: 'Email address',
+                                      icon: Icons.mail_outline,
+                                    ),
+                                    validator: _validateEmail,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  TextFormField(
+                                    controller: _passwordController,
+                                    obscureText: true,
+                                    autofillHints: const [
+                                      AutofillHints.password,
+                                    ],
+                                    decoration: _fieldDecoration(
+                                      label: 'Password',
+                                      icon: Icons.lock_outline,
+                                    ),
+                                    validator: _validatePassword,
+                                  ),
+                                  if (_mode == AuthMode.signUp) ...[
+                                    const SizedBox(height: 16),
+                                    TextFormField(
+                                      controller: _confirmPasswordController,
+                                      obscureText: true,
+                                      decoration: _fieldDecoration(
+                                        label: 'Confirm password',
+                                        icon: Icons.lock_reset_outlined,
+                                      ),
+                                      validator: _validateConfirmPassword,
+                                    ),
+                                  ],
+                                  if (_mode == AuthMode.signIn) ...[
+                                    const SizedBox(height: 12),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: TextButton(
+                                        onPressed: () {},
+                                        style: TextButton.styleFrom(
+                                          padding: EdgeInsets.zero,
+                                          foregroundColor: const Color(
+                                            0xFF6A62FF,
+                                          ),
+                                        ),
+                                        child: const Text('Forgot password?'),
+                                      ),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 24),
+                                  _PrimaryButton(
+                                    onPressed: _isSubmitting ? null : _submit,
+                                    child: _isSubmitting
+                                        ? const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              valueColor:
+                                                  AlwaysStoppedAnimation<Color>(
+                                                    Colors.white,
+                                                  ),
+                                            ),
+                                          )
+                                        : Text(
+                                            _mode == AuthMode.signIn
+                                                ? 'Sign in'
+                                                : 'Create account',
+                                          ),
+                                  ),
+                                  if (_mode == AuthMode.signIn) ...[
+                                    const SizedBox(height: 16),
+                                    _SecondaryButton(
+                                      onPressed: _continueAsGuest,
+                                      child: const Text('Continue as guest'),
+                                    ),
+                                  ],
+                                ],
                               ),
-                              const SizedBox(height: 16),
-                              _SecondaryButton(
-                                onPressed: _continueAsGuest,
-                                child: const Text('Continue as guest'),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 16),
+                    Center(
+                      child: TextButton(
+                        onPressed: () => _switchMode(
+                          _mode == AuthMode.signIn
+                              ? AuthMode.signUp
+                              : AuthMode.signIn,
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFF6A62FF),
+                        ),
+                        child: Text(
+                          _mode == AuthMode.signIn
+                              ? 'New here? Create an account'
+                              : 'Already have an account? Sign in',
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                Center(
-                  child: TextButton(
-                    onPressed: () => _switchMode(
-                      _mode == AuthMode.signIn
-                          ? AuthMode.signUp
-                          : AuthMode.signIn,
-                    ),
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF6A62FF),
-                    ),
-                    child: Text(
-                      _mode == AuthMode.signIn
-                          ? 'New here? Create an account'
-                          : 'Already have an account? Sign in',
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -518,10 +636,7 @@ class _AuthScreenState extends State<AuthScreen> {
 }
 
 class _ModeToggle extends StatelessWidget {
-  const _ModeToggle({
-    required this.mode,
-    required this.onChanged,
-  });
+  const _ModeToggle({required this.mode, required this.onChanged});
 
   final AuthMode mode;
   final ValueChanged<AuthMode> onChanged;
@@ -532,33 +647,51 @@ class _ModeToggle extends StatelessWidget {
       children: [
         Expanded(
           child: OutlinedButton(
-            onPressed:
-                mode == AuthMode.signIn ? null : () => onChanged(AuthMode.signIn),
+            onPressed: () => onChanged(AuthMode.signIn),
             style: OutlinedButton.styleFrom(
               foregroundColor: mode == AuthMode.signIn
                   ? Colors.white
-                  : const Color(0xFF6A62FF),
-              backgroundColor:
-                  mode == AuthMode.signIn ? const Color(0xFF6A62FF) : Colors.white,
+                  : const Color(0xFF1F1F1F),
+              backgroundColor: mode == AuthMode.signIn
+                  ? const Color(0xFF6A62FF)
+                  : Colors.white,
+              side: const BorderSide(color: Color(0xFF6A62FF)),
               padding: const EdgeInsets.symmetric(vertical: 14),
+              textStyle: const TextStyle(fontWeight: FontWeight.w700),
             ),
-            child: const Text('Sign In'),
+            child: Text(
+              'Sign In',
+              style: TextStyle(
+                color: mode == AuthMode.signIn
+                    ? Colors.white
+                    : const Color(0xFF1F1F1F),
+              ),
+            ),
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: OutlinedButton(
-            onPressed:
-                mode == AuthMode.signUp ? null : () => onChanged(AuthMode.signUp),
+            onPressed: () => onChanged(AuthMode.signUp),
             style: OutlinedButton.styleFrom(
               foregroundColor: mode == AuthMode.signUp
                   ? Colors.white
-                  : const Color(0xFF6A62FF),
-              backgroundColor:
-                  mode == AuthMode.signUp ? const Color(0xFF6A62FF) : Colors.white,
+                  : const Color(0xFF1F1F1F),
+              backgroundColor: mode == AuthMode.signUp
+                  ? const Color(0xFF6A62FF)
+                  : Colors.white,
+              side: const BorderSide(color: Color(0xFF6A62FF)),
               padding: const EdgeInsets.symmetric(vertical: 14),
+              textStyle: const TextStyle(fontWeight: FontWeight.w700),
             ),
-            child: const Text('Sign Up'),
+            child: Text(
+              'Sign Up',
+              style: TextStyle(
+                color: mode == AuthMode.signUp
+                    ? Colors.white
+                    : const Color(0xFF1F1F1F),
+              ),
+            ),
           ),
         ),
       ],
@@ -567,10 +700,7 @@ class _ModeToggle extends StatelessWidget {
 }
 
 class _PrimaryButton extends StatelessWidget {
-  const _PrimaryButton({
-    required this.onPressed,
-    required this.child,
-  });
+  const _PrimaryButton({required this.onPressed, required this.child});
 
   final VoidCallback? onPressed;
   final Widget child;
@@ -595,10 +725,7 @@ class _PrimaryButton extends StatelessWidget {
 }
 
 class _SecondaryButton extends StatelessWidget {
-  const _SecondaryButton({
-    required this.onPressed,
-    required this.child,
-  });
+  const _SecondaryButton({required this.onPressed, required this.child});
 
   final VoidCallback? onPressed;
   final Widget child;
