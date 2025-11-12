@@ -467,7 +467,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                           child:
                                               DropdownButtonFormField<String>(
                                                 isExpanded: true,
-                                                value: _selectedCity,
+                                                initialValue: _selectedCity,
                                                 items: _syrianCities
                                                     .map(
                                                       (city) =>
@@ -493,7 +493,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                           child:
                                               DropdownButtonFormField<String>(
                                                 isExpanded: true,
-                                                value: _selectedCategory,
+                                                initialValue: _selectedCategory,
                                                 items: _categories
                                                     .map(
                                                       (category) =>
