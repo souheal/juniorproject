@@ -351,14 +351,14 @@ class _AuthScreenState extends State<AuthScreen> {
         backgroundColor: const Color(0xFFF6F6F6),
         body: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 820),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     Text(
                       _mode == AuthMode.signIn
                           ? 'Welcome back'
@@ -376,7 +376,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         color: const Color(0xFF707070),
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
                     Card(
                       elevation: 4,
                       shape: RoundedRectangleBorder(
@@ -384,14 +384,14 @@ class _AuthScreenState extends State<AuthScreen> {
                       ),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 20,
+                          horizontal: 18,
+                          vertical: 16,
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             _ModeToggle(mode: _mode, onChanged: _switchMode),
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 18),
                             Form(
                               key: _formKey,
                               child: Column(
@@ -403,7 +403,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                         GestureDetector(
                                           onTap: _showImageSourceActionSheet,
                                           child: CircleAvatar(
-                                            radius: 36,
+                                            radius: 32,
                                             backgroundColor: const Color(
                                               0xFF6A62FF,
                                             ),
@@ -421,7 +421,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                                 : null,
                                           ),
                                         ),
-                                        const SizedBox(width: 16),
+                                        const SizedBox(width: 12),
                                         Expanded(
                                           child: Text(
                                             'Add a profile photo so friends can find you.',
@@ -436,7 +436,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 20),
+                                    const SizedBox(height: 14),
                                     TextFormField(
                                       controller: _nameController,
                                       textCapitalization:
@@ -447,7 +447,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                       ),
                                       validator: _validateName,
                                     ),
-                                    const SizedBox(height: 16),
+                                    const SizedBox(height: 12),
                                     TextFormField(
                                       controller: _phoneController,
                                       keyboardType: TextInputType.phone,
@@ -460,65 +460,48 @@ class _AuthScreenState extends State<AuthScreen> {
                                       ),
                                       validator: _validatePhone,
                                     ),
-                                    const SizedBox(height: 16),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child:
-                                              DropdownButtonFormField<String>(
-                                                isExpanded: true,
-                                                initialValue: _selectedCity,
-                                                items: _syrianCities
-                                                    .map(
-                                                      (city) =>
-                                                          DropdownMenuItem(
-                                                            value: city,
-                                                            child: Text(city),
-                                                          ),
-                                                    )
-                                                    .toList(),
-                                                decoration: _fieldDecoration(
-                                                  label: 'City',
-                                                  icon: Icons
-                                                      .location_city_outlined,
-                                                ),
-                                                onChanged: (value) => setState(
-                                                  () => _selectedCity = value,
-                                                ),
-                                                validator: _validateCity,
-                                              ),
-                                        ),
-                                        const SizedBox(width: 16),
-                                        Expanded(
-                                          child:
-                                              DropdownButtonFormField<String>(
-                                                isExpanded: true,
-                                                initialValue: _selectedCategory,
-                                                items: _categories
-                                                    .map(
-                                                      (category) =>
-                                                          DropdownMenuItem(
-                                                            value: category,
-                                                            child: Text(
-                                                              category,
-                                                            ),
-                                                          ),
-                                                    )
-                                                    .toList(),
-                                                decoration: _fieldDecoration(
-                                                  label: 'Category',
-                                                  icon: Icons.work_outline,
-                                                ),
-                                                onChanged: (value) => setState(
-                                                  () =>
-                                                      _selectedCategory = value,
-                                                ),
-                                                validator: _validateCategory,
-                                              ),
-                                        ),
-                                      ],
+                                    const SizedBox(height: 12),
+                                    DropdownButtonFormField<String>(
+                                      isExpanded: true,
+                                      initialValue: _selectedCity,
+                                      items: _syrianCities
+                                          .map(
+                                            (city) => DropdownMenuItem(
+                                              value: city,
+                                              child: Text(city),
+                                            ),
+                                          )
+                                          .toList(),
+                                      decoration: _fieldDecoration(
+                                        label: 'City',
+                                        icon: Icons.location_city_outlined,
+                                      ),
+                                      onChanged: (value) =>
+                                          setState(() => _selectedCity = value),
+                                      validator: _validateCity,
                                     ),
-                                    const SizedBox(height: 16),
+                                    const SizedBox(height: 12),
+                                    DropdownButtonFormField<String>(
+                                      isExpanded: true,
+                                      initialValue: _selectedCategory,
+                                      items: _categories
+                                          .map(
+                                            (category) => DropdownMenuItem(
+                                              value: category,
+                                              child: Text(category),
+                                            ),
+                                          )
+                                          .toList(),
+                                      decoration: _fieldDecoration(
+                                        label: 'Category',
+                                        icon: Icons.work_outline,
+                                      ),
+                                      onChanged: (value) => setState(
+                                        () => _selectedCategory = value,
+                                      ),
+                                      validator: _validateCategory,
+                                    ),
+                                    const SizedBox(height: 12),
                                   ],
                                   TextFormField(
                                     controller: _emailController,
@@ -530,7 +513,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                     ),
                                     validator: _validateEmail,
                                   ),
-                                  const SizedBox(height: 16),
+                                  const SizedBox(height: 12),
                                   TextFormField(
                                     controller: _passwordController,
                                     obscureText: true,
@@ -544,7 +527,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                     validator: _validatePassword,
                                   ),
                                   if (_mode == AuthMode.signUp) ...[
-                                    const SizedBox(height: 16),
+                                    const SizedBox(height: 12),
                                     TextFormField(
                                       controller: _confirmPasswordController,
                                       obscureText: true,
@@ -571,7 +554,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                       ),
                                     ),
                                   ],
-                                  const SizedBox(height: 24),
+                                  const SizedBox(height: 18),
                                   _PrimaryButton(
                                     onPressed: _isSubmitting ? null : _submit,
                                     child: _isSubmitting
@@ -593,7 +576,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                           ),
                                   ),
                                   if (_mode == AuthMode.signIn) ...[
-                                    const SizedBox(height: 16),
+                                    const SizedBox(height: 12),
                                     _SecondaryButton(
                                       onPressed: _continueAsGuest,
                                       child: const Text('Continue as guest'),
@@ -606,7 +589,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     Center(
                       child: TextButton(
                         onPressed: () => _switchMode(
@@ -656,7 +639,7 @@ class _ModeToggle extends StatelessWidget {
                   ? const Color(0xFF6A62FF)
                   : Colors.white,
               side: const BorderSide(color: Color(0xFF6A62FF)),
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              padding: const EdgeInsets.symmetric(vertical: 12),
               textStyle: const TextStyle(fontWeight: FontWeight.w700),
             ),
             child: Text(
@@ -681,7 +664,7 @@ class _ModeToggle extends StatelessWidget {
                   ? const Color(0xFF6A62FF)
                   : Colors.white,
               side: const BorderSide(color: Color(0xFF6A62FF)),
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              padding: const EdgeInsets.symmetric(vertical: 12),
               textStyle: const TextStyle(fontWeight: FontWeight.w700),
             ),
             child: Text(
@@ -712,7 +695,7 @@ class _PrimaryButton extends StatelessWidget {
       child: FilledButton(
         onPressed: onPressed,
         style: FilledButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          padding: const EdgeInsets.symmetric(vertical: 14),
           backgroundColor: const Color(0xFF6A62FF),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
@@ -737,7 +720,7 @@ class _SecondaryButton extends StatelessWidget {
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 14),
+          padding: const EdgeInsets.symmetric(vertical: 12),
           foregroundColor: const Color(0xFF6A62FF),
           side: const BorderSide(color: Color(0xFF6A62FF)),
           shape: RoundedRectangleBorder(
