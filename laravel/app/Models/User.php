@@ -3,7 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Illuminate\Database\Eloquent\Factories\HasFactory; 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -15,11 +15,19 @@ class User extends Authenticatable
     /**
      * The attributes that are mass assignable.
      *
+     * These must match the columns in your `users` table
+     * that you want to fill via create() / update().
+     *
      * @var list<string>
      */
     protected $fillable = [
+        'role_id',
         'name',
         'email',
+        'phone',
+        'location',
+        'picture',
+        'birth_date',
         'password',
     ];
 
@@ -42,7 +50,8 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'birth_date'        => 'date',
+            'password'          => 'hashed',
         ];
     }
 }
