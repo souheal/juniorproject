@@ -5,7 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'illustrations/event_illustrations.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
-
+ 
 void main() {
   runApp(const EventsApp());
 }
