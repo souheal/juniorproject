@@ -17,6 +17,7 @@ public function run(): void
 {
     $this->call([
         RoleSeeder::class,
+        CategorySeeder::class,
     ]);
 }
 
