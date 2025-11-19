@@ -21,3 +21,4 @@ class Category extends Model
         return $this->belongsToMany(User::class, 'category_user');
     }
 }
+
