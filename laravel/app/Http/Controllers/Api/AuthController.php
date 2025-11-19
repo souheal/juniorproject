@@ -1,5 +1,5 @@
 <?php
-  
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -9,6 +9,11 @@ use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\VerifyEmailMail;
+use App\Mail\NewLoginMail;
+
 
 class AuthController extends Controller
 {
@@ -88,6 +93,19 @@ class AuthController extends Controller
             'picture'    => $imagePath,
         ]);
 
+        $verificationToken = Str::random(64);
+
+        $user->email_verification_token = $verificationToken;
+        $user->save();
+
+        // 🔹 نبني رابط التحقق (حالياً نرجّعه في الـ JSON، وبعدها ممكن ترسله بالإيميل)
+        $verificationUrl = url('/api/auth/verify-email?token=' . $verificationToken);
+        // 4-b: إرسال إيميل التفعيل
+        Mail::to($user->email)->send(new VerifyEmailMail($user, $verificationUrl));
+
+
+
+
         // 5. Attach categories (many-to-many)
         //    We receive category NAMES, need to convert them to IDs.
         $categoryNames = $validated['categories']; // array of strings
@@ -101,6 +119,7 @@ class AuthController extends Controller
         // 7. Return JSON response (including categories as names)
         return response()->json([
             'message' => 'User registered successfully',
+            'verification_url' => $verificationUrl, // 👈 مؤقتاً عشان تجرب
             'user'    => [
                 'id'          => $user->id,
                 'name'        => $user->name,
@@ -115,4 +134,100 @@ class AuthController extends Controller
             ],
         ], 201);
     }
+    
+
+public function login(Request $request)
+{
+    $data = $request->validate([
+        'email'    => ['required', 'email'],
+        'password' => ['required', 'string', 'min:6'],
+    ]);
+
+    $user = User::where('email', $data['email'])->first();
+
+    if (! $user || ! Hash::check($data['password'], $user->password)) {
+        return response()->json([
+            'message' => 'Invalid email or password',
+        ], 401);
+    }
+
+    if ($user->email_verified_at === null) {
+        return response()->json([
+            'message' => 'Email is not verified',
+        ], 403);
+    }
+
+    // 👇👇 من هون منبدأ شغل الـ IP
+    $currentIp = $request->ip();              // IP الحالي
+    $previousIp = $user->last_login_ip;       // آخر IP مخزّن (ممكن يكون null أول مرة)
+
+    $isNewIp = $previousIp !== $currentIp;
+
+    if ($isNewIp) {
+        // ابعت إيميل للمستخدم إن في تسجيل دخول من IP جديد
+        Mail::to($user->email)->send(new NewLoginMail($user, $currentIp, $previousIp));
+    }
+
+    // حدّث آخر IP سواء جديد أو نفسو
+    $user->last_login_ip = $currentIp;
+    $user->save();
+    // 👆👆 هون خلصنا منطق الـ IP
+
+    // باقي منطق التوكن زي ما كان
+    $user->tokens()->delete();
+    $token = $user->createToken('auth_token')->plainTextToken;
+
+    return response()->json([
+        'message' => 'Logged in successfully',
+        'user'    => $user,
+        'token'   => $token,
+    ]);
 }
+
+
+public function verifyEmail(Request $request)
+{
+    $request->validate([
+        'token' => ['required', 'string'],
+    ]);
+
+    $user = User::where('email_verification_token', $request->token)->first();
+
+    if (! $user) {
+        return response()->json([
+            'message' => 'Invalid or expired verification token',
+        ], 400);
+    }
+
+    // لو هو أصلاً مفعّل
+    if ($user->email_verified_at !== null) {
+        return response()->json([
+            'message' => 'Email is already verified',
+        ], 200);
+    }
+
+    $user->email_verified_at = now();
+    $user->email_verification_token = null;
+    $user->save();
+
+    return response()->json([
+        'message' => 'Email verified successfully',
+    ], 200);
+}
+
+
+
+    /**
+     * Handle user logout (needs auth:sanctum middleware).
+     */
+    public function logout(Request $request)
+    {
+        // delete current access token only
+        $request->user()->currentAccessToken()->delete();
+
+        return response()->json([
+            'message' => 'Logged out successfully',
+        ]);
+    }
+}
+
