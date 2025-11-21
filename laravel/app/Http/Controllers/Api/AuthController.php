@@ -239,7 +239,6 @@ public function verifyEmail(Request $request)
             'message' => 'Logged out successfully',
         ]);
     }
-
     /**
      * Example verify-email endpoint (placeholder).
      */
@@ -277,3 +276,4 @@ public function verifyEmail(Request $request)
         ]);
     }
 }
+
