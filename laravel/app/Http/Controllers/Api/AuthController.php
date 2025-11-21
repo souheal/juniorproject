@@ -144,50 +144,27 @@ class AuthController extends Controller
 
 public function login(Request $request)
 {
-    $data = $request->validate([
-        'email'    => ['required', 'email'],
-        'password' => ['required', 'string', 'min:6'],
+    $credentials = $request->validate([
+        'email' => ['required', 'email'],
+        'password' => ['required', 'string'],
     ]);
 
-    $user = User::where('email', $data['email'])->first();
+    $user = User::where('email', $credentials['email'])->first();
 
-    if (! $user || ! Hash::check($data['password'], $user->password)) {
+    if (! $user || ! Hash::check($credentials['password'], $user->password)) {
         return response()->json([
-            'message' => 'Invalid email or password',
+            'message' => 'These credentials do not match our records.',
         ], 401);
     }
 
-    if ($user->email_verified_at === null) {
-        return response()->json([
-            'message' => 'Email is not verified',
-        ], 403);
-    }
-
-    // 👇👇 من هون منبدأ شغل الـ IP
-    $currentIp = $request->ip();              // IP الحالي
-    $previousIp = $user->last_login_ip;       // آخر IP مخزّن (ممكن يكون null أول مرة)
-
-    $isNewIp = $previousIp !== $currentIp;
-
-    if ($isNewIp) {
-        // ابعت إيميل للمستخدم إن في تسجيل دخول من IP جديد
-        Mail::to($user->email)->send(new NewLoginMail($user, $currentIp, $previousIp));
-    }
-
-    // حدّث آخر IP سواء جديد أو نفسو
-    $user->last_login_ip = $currentIp;
-    $user->save();
-    // 👆👆 هون خلصنا منطق الـ IP
-
-    // باقي منطق التوكن زي ما كان
-    $user->tokens()->delete();
-    $token = $user->createToken('auth_token')->plainTextToken;
-
     return response()->json([
-        'message' => 'Logged in successfully',
-        'user'    => $user,
-        'token'   => $token,
-    ]);
+        'message' => 'Login successful',
+        'user' => [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+        ],
+    ], 200);
 }
 
 

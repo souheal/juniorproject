@@ -230,7 +230,19 @@ class _AuthScreenState extends State<AuthScreen> {
           final responseData = json.decode(response.body);
           final message = responseData['message'] ?? 'User registered successfully';
 
-          setState(() => _isSubmitting = false);
+          // Clear all form fields after successful signup
+          setState(() {
+            _isSubmitting = false;
+            _nameController.clear();
+            _phoneController.clear();
+            _emailController.clear();
+            _passwordController.clear();
+            _confirmPasswordController.clear();
+            _birthDateController.clear();
+            _selectedCity = null;
+            _selectedCategory = null;
+            _profileImageBytes = null;
+          });
 
           // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
