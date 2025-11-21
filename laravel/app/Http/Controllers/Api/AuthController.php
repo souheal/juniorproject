@@ -239,41 +239,5 @@ public function verifyEmail(Request $request)
             'message' => 'Logged out successfully',
         ]);
     }
-    /**
-     * Example verify-email endpoint (placeholder).
-     */
-    public function verifyEmail(Request $request)
-    {
-        $email = $request->query('email');
-
-        if (! $email) {
-            return response()->json([
-                'message' => 'Email is required',
-            ], 400);
-        }
-
-        $user = User::where('email', $email)->first();
-
-        if (! $user) {
-            return response()->json([
-                'message' => 'User not found',
-            ], 404);
-        }
-
-        if ($user->email_verified_at) {
-            return response()->json([
-                'message' => 'Email already verified',
-            ]);
-        }
-
-        // TODO: check your verification code here if you have one.
-
-        $user->email_verified_at = now();
-        $user->save();
-
-        return response()->json([
-            'message' => 'Email verified successfully',
-        ]);
-    }
 }
 
