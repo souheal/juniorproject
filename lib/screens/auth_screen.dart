@@ -28,6 +28,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
+  final TextEditingController _birthDateController = TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
 
   static const List<String> _syrianCities = [
@@ -73,6 +74,7 @@ class _AuthScreenState extends State<AuthScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _birthDateController.dispose();
     super.dispose();
   }
 
@@ -307,6 +309,16 @@ class _AuthScreenState extends State<AuthScreen> {
     return null;
   }
 
+  String? _validateBirthDate(String? value) {
+    if (_mode != AuthMode.signUp) {
+      return null;
+    }
+    if (value == null || value.isEmpty) {
+      return 'Please select your birth date';
+    }
+    return null;
+  }
+
   InputDecoration _fieldDecoration({
     required String label,
     required IconData icon,
@@ -500,6 +512,32 @@ class _AuthScreenState extends State<AuthScreen> {
                                         () => _selectedCategory = value,
                                       ),
                                       validator: _validateCategory,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    TextFormField(
+                                      controller: _birthDateController,
+                                      readOnly: true,
+                                      decoration: _fieldDecoration(
+                                        label: 'Birth date',
+                                        icon: Icons.calendar_today_outlined,
+                                      ),
+                                      onTap: () async {
+                                        final picked = await showDatePicker(
+                                          context: context,
+                                          initialDate: DateTime.now().subtract(
+                                            const Duration(days: 365 * 18),
+                                          ),
+                                          firstDate: DateTime(1900),
+                                          lastDate: DateTime.now(),
+                                        );
+                                        if (picked != null) {
+                                          setState(() {
+                                            _birthDateController.text =
+                                                '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+                                          });
+                                        }
+                                      },
+                                      validator: _validateBirthDate,
                                     ),
                                     const SizedBox(height: 12),
                                   ],
