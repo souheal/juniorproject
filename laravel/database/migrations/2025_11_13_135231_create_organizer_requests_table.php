@@ -10,13 +10,22 @@ return new class extends Migration
     {
         Schema::create('organizer_requests', function (Blueprint $table) {
             $table->id();
+
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
-            $table->string('organization_name');
-            $table->text('description')->nullable();
-            $table->string('documents');
+
+            $table->string('organization_name');   // إجباري
+            $table->text('description');          // إجباري (ما في ->nullable())
+
+            $table->string('documents')->nullable(); // ممكن يرفع ملف أو لأ
+
             $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
+
             $table->text('admin_comment')->nullable();
+
             $table->timestamps();
+
+        // خيار تصميم: طلب واحد لكل يوزر
+            $table->unique('user_id');
         });
     }
 

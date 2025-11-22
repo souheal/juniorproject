@@ -42,4 +42,20 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Category::class, 'category_user');
     }
+
+    public function organizerRequests()
+    {
+        return $this->hasMany(OrganizerRequest::class);
+    }
+
+    public function role()
+    {
+        return $this->belongsTo(Role::class);
+    }
+
+    public function notifications()
+    {
+        return $this->hasMany(\App\Models\Notification::class);
+    }
+
 }
