@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'home_screen.dart';
+import '../services/api_client.dart';
 
 enum AuthMode { signIn, signUp }
 
@@ -28,6 +30,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
+  final TextEditingController _birthDateController = TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
 
   static const List<String> _syrianCities = [
@@ -73,6 +76,7 @@ class _AuthScreenState extends State<AuthScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _birthDateController.dispose();
     super.dispose();
   }
 
@@ -197,21 +201,177 @@ class _AuthScreenState extends State<AuthScreen> {
 
     setState(() => _isSubmitting = true);
 
-    if (!mounted) {
+    try {
+      // Only call API for Sign Up mode
+      if (_mode == AuthMode.signUp) {
+        // Build the JSON payload matching Laravel's expected format
+        final requestData = {
+          'name': _nameController.text.trim(),
+          'email': _emailController.text.trim(),
+          'phone': _phoneController.text.trim(),
+          'location': _selectedCity ?? '',
+          'birth_date': _birthDateController.text.trim(),
+          'password': _passwordController.text,
+          'password_confirmation': _confirmPasswordController.text,
+          'picture': null, // For now, send null (or base64 string if needed)
+          'categories': [_selectedCategory ?? ''],
+        };
+
+        // Call the API
+        final response = await ApiClient.registerUser(requestData);
+
+        if (!mounted) {
+          return;
+        }
+
+        // Handle response
+        if (response.statusCode == 201) {
+          // Success
+          final responseData = json.decode(response.body);
+          final message = responseData['message'] ?? 'User registered successfully';
+
+          // Clear all form fields after successful signup
+          setState(() {
+            _isSubmitting = false;
+            _nameController.clear();
+            _phoneController.clear();
+            _emailController.clear();
+            _passwordController.clear();
+            _confirmPasswordController.clear();
+            _birthDateController.clear();
+            _selectedCity = null;
+            _selectedCategory = null;
+            _profileImageBytes = null;
+          });
+
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          // Navigate to home or next screen
+          final completed = widget.onCompleted;
+          if (completed != null) {
+            completed(context);
+            return;
+          }
+
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute<void>(builder: (_) => const HomeScreen()),
+          );
+          return;
+        } else if (response.statusCode == 422) {
+          // Validation error from Laravel
+          final errorData = json.decode(response.body);
+          final errors = errorData['errors'] as Map<String, dynamic>?;
+
+          String errorMessage = 'Validation failed';
+          if (errors != null && errors.isNotEmpty) {
+            // Get the first error message
+            final firstError = errors.values.first;
+            if (firstError is List && firstError.isNotEmpty) {
+              errorMessage = firstError.first.toString();
+            }
+          }
+
+          setState(() => _isSubmitting = false);
+
+          if (!mounted) {
+            return;
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        } else {
+          // Other error
+          setState(() => _isSubmitting = false);
+
+          if (!mounted) {
+            return;
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Something went wrong. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+      } else if (_mode == AuthMode.signIn) {
+        final email = _emailController.text.trim();
+        final password = _passwordController.text;
+
+        final response = await ApiClient.loginUser(email, password);
+
+        if (!mounted) return;
+
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          final message = data['message'] ?? 'Login successful';
+
+          setState(() => _isSubmitting = false);
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          final completed = widget.onCompleted;
+          if (completed != null) {
+            completed(context);
+            return;
+          }
+
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute<void>(builder: (_) => const HomeScreen()),
+          );
+        } else if (response.statusCode == 401) {
+          setState(() => _isSubmitting = false);
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Email or password is incorrect.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        } else {
+          setState(() => _isSubmitting = false);
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Something went wrong. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Network or other error
+      setState(() => _isSubmitting = false);
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Connection error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
       return;
     }
-
-    setState(() => _isSubmitting = false);
-
-    final completed = widget.onCompleted;
-    if (completed != null) {
-      completed(context);
-      return;
-    }
-
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => const HomeScreen()),
-    );
   }
 
   void _continueAsGuest() {
@@ -303,6 +463,16 @@ class _AuthScreenState extends State<AuthScreen> {
     }
     if (value == null || value.isEmpty) {
       return 'Please select a category';
+    }
+    return null;
+  }
+
+  String? _validateBirthDate(String? value) {
+    if (_mode != AuthMode.signUp) {
+      return null;
+    }
+    if (value == null || value.isEmpty) {
+      return 'Please select your birth date';
     }
     return null;
   }
@@ -500,6 +670,32 @@ class _AuthScreenState extends State<AuthScreen> {
                                         () => _selectedCategory = value,
                                       ),
                                       validator: _validateCategory,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    TextFormField(
+                                      controller: _birthDateController,
+                                      readOnly: true,
+                                      decoration: _fieldDecoration(
+                                        label: 'Birth date',
+                                        icon: Icons.calendar_today_outlined,
+                                      ),
+                                      onTap: () async {
+                                        final picked = await showDatePicker(
+                                          context: context,
+                                          initialDate: DateTime.now().subtract(
+                                            const Duration(days: 365 * 18),
+                                          ),
+                                          firstDate: DateTime(1900),
+                                          lastDate: DateTime.now(),
+                                        );
+                                        if (picked != null) {
+                                          setState(() {
+                                            _birthDateController.text =
+                                                '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+                                          });
+                                        }
+                                      },
+                                      validator: _validateBirthDate,
                                     ),
                                     const SizedBox(height: 12),
                                   ],

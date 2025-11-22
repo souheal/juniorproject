@@ -2,42 +2,48 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\User\OrganizerRequestController;
 use App\Http\Controllers\Admin\OrganizerRequestAdminController;
 use App\Http\Controllers\Api\NotificationController;
 
+// =====================
+// Auth routes
+// =====================
+Route::prefix('auth')->group(function () {
+    // signup / login
+    Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/signup', [AuthController::class, 'register']); // alias للفلاتر
+    Route::post('/login', [AuthController::class, 'login']);
 
-Route::prefix('auth')->controller(AuthController::class)->group(function () {
-    Route::post('/register', 'register');
-    Route::post('/login', 'login');
-    Route::get('/verify-email', 'verifyEmail'); // 👈 جديد
-    Route::post('/logout', 'logout')->middleware('auth:sanctum'); // لو عندك logout
+    // email verification
+    Route::get('/verify-email', [AuthController::class, 'verifyEmail']);
+
+    // logout
+    Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
+
+    // password reset
+    Route::post('/password/forgot', [PasswordResetController::class, 'requestReset']);
+    Route::post('/password/reset', [PasswordResetController::class, 'reset']);
 });
 
+// =====================
+// Protected routes (need auth:sanctum)
+// =====================
 Route::middleware('auth:sanctum')->group(function () {
-
-    // 🟢 user side
+    // 🟢 Organizer Request – user side
     Route::post('/organizer-requests', [OrganizerRequestController::class, 'store']);
     Route::get('/organizer-requests/me', [OrganizerRequestController::class, 'myRequests']);
 
-    // 🔴 admin side
+    // 🔴 Organizer Request – admin side
     Route::prefix('admin')->group(function () {
-    Route::get('/organizer-requests', [OrganizerRequestAdminController::class, 'index']);
-    Route::post('/organizer-requests/{id}/approve', [OrganizerRequestAdminController::class, 'approve']);
-    Route::post('/organizer-requests/{id}/reject', [OrganizerRequestAdminController::class, 'reject']);
-});
+        Route::get('/organizer-requests', [OrganizerRequestAdminController::class, 'index']);
+        Route::post('/organizer-requests/{id}/approve', [OrganizerRequestAdminController::class, 'approve']);
+        Route::post('/organizer-requests/{id}/reject', [OrganizerRequestAdminController::class, 'reject']);
+    });
 
-Route::middleware('auth:sanctum')->group(function () {
-
-    // ...
-
+    // 🔔 Notifications
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
 });
-
-
-
-});
-
-
