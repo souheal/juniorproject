@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\User\OrganizerRequestController;
 use App\Http\Controllers\Admin\OrganizerRequestAdminController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\EventController;
+
 
 // =====================
 // Auth routes
@@ -46,4 +48,33 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+});
+
+
+
+Route::middleware('auth:sanctum')->group(function () {
+
+    // =====================
+    // Organizer events
+    // =====================
+    Route::prefix('events')->group(function () {
+        // organizer يشوف أحداثه
+        Route::get('/', [EventController::class, 'index']);
+
+        // create (organizer only)
+        Route::post('/', [EventController::class, 'store']);
+
+        // update (organizer فقط ومالك الحدث)
+        Route::put('/{id}', [EventController::class, 'update']);
+    });
+
+    // =====================
+    // Admin delete
+    // =====================
+    Route::prefix('admin')->group(function () {
+        Route::delete('/events/{id}', [EventController::class, 'destroy']);
+    });
+
+    // باقي روتاتك (organizer requests, notifications, ...)
+
 });

@@ -144,28 +144,52 @@ class AuthController extends Controller
 
 public function login(Request $request)
 {
-    $credentials = $request->validate([
-        'email' => ['required', 'email'],
-        'password' => ['required', 'string'],
+    $data = $request->validate([
+        'email'    => ['required', 'email'],
+        'password' => ['required', 'string', 'min:6'],
     ]);
 
-    $user = User::where('email', $credentials['email'])->first();
+    $user = User::where('email', $data['email'])->first();
 
-    if (! $user || ! Hash::check($credentials['password'], $user->password)) {
+    if (! $user || ! Hash::check($data['password'], $user->password)) {
         return response()->json([
-            'message' => 'These credentials do not match our records.',
+            'message' => 'Invalid email or password',
         ], 401);
+    }
+
+    // لازم يكون الإيميل مفعَّل
+    if ($user->email_verified_at === null) {
+        return response()->json([
+            'message' => 'Email is not verified',
+        ], 403);
+    }
+
+    // نحدد الـ IP الحالي
+    $currentIp   = $request->ip();
+    $isNewDevice = $user->last_login_ip !== $currentIp;
+
+    // نخزّن آخر IP
+    $user->last_login_ip = $currentIp;
+    $user->save();
+
+    // نمسح التوكنات القديمة (اختياري بس أنظف)
+    $user->tokens()->delete();
+
+    // نولّد توكن جديد لـ Sanctum
+    $token = $user->createToken('auth_token')->plainTextToken;
+
+    // لو IP جديد → نبعت إيميل (اختياري)
+    if ($isNewDevice) {
+        Mail::to($user->email)->send(new NewLoginMail($user, $currentIp));
     }
 
     return response()->json([
         'message' => 'Login successful',
-        'user' => [
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-        ],
-    ], 200);
+        'user'    => $user,
+        'token'   => $token,
+    ]);
 }
+
 
 
 public function verifyEmail(Request $request)
