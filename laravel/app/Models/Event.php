@@ -35,4 +35,10 @@ class Event extends Model
     {
         return $this->hasMany(Ticket::class);
     }
+
+    public function volunteerRequests()
+    {   
+        return $this->hasMany(\App\Models\VolunteerRequest::class);
+    }
+
 }

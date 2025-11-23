@@ -58,4 +58,11 @@ class User extends Authenticatable
         return $this->hasMany(\App\Models\Notification::class);
     }
 
+    public function volunteerRequests()
+    {
+        return $this->hasMany(\App\Models\VolunteerRequest::class);
+    }
+
+
+
 }
