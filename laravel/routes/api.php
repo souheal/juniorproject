@@ -8,7 +8,7 @@ use App\Http\Controllers\Admin\OrganizerRequestAdminController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\User\VolunteerRequestController;
-use App\Http\Controllers\Api\CategoryController
+use App\Http\Controllers\Api\CategoryController;
 
 // =====================
 // Auth routes (public)

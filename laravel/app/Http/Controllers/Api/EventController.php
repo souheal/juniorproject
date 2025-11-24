@@ -64,21 +64,28 @@ class EventController extends Controller
     {
         $organizer = $this->requireOrganizer($request);
 
-        $data = $request->validate([
-            'name'        => ['required', 'string', 'max:255'],
-            'description' => ['required', 'string'],
-            'start_time'  => ['required', 'date'],
-            'end_time'    => ['required', 'date', 'after:start_time'],
-            'location'    => ['required', 'string', 'max:255'],
-            'capacity'    => ['required', 'integer', 'min:1'],
-            'price'       => ['required', 'numeric', 'min:0'],
-            'online_link' => ['nullable', 'string', 'max:500'],
-            'picture'     => ['nullable', 'string'], // base64
+$data = $request->validate([
+    'name'        => ['required', 'string', 'max:255'],
+    'description' => ['required', 'string'],
+    'start_time'  => ['required', 'date'],
+    'end_time'    => ['required', 'date', 'after:start_time'],
 
-            // 👇 جديد: الكاتيجوريز (IDs من جدول categories)
-            'categories'   => ['nullable', 'array'],
-            'categories.*' => ['integer', 'exists:categories,id'],
-        ]);
+    'city'        => ['required', 'string', 'max:255'],
+    'location'    => ['required', 'string', 'max:255'],  
+    'venue'       => ['required', 'string', 'max:255'],  
+
+    'is_live'     => ['sometimes', 'boolean'],           
+
+    'capacity'    => ['required', 'integer', 'min:1'],
+    'price'       => ['required', 'numeric', 'min:0'],
+    'online_link' => ['nullable', 'string', 'max:500'],
+    'picture'     => ['nullable', 'string'], // base64
+
+    // categories (IDs from categories table)
+    'categories'   => ['required', 'array'],
+    'categories.*' => ['integer', 'exists:categories,id'],
+]);
+
 
         $picturePath = null;
 
@@ -92,18 +99,24 @@ class EventController extends Controller
             }
         }
 
-        $event = Event::create([
-            'organizer_id' => $organizer->id,
-            'name'         => $data['name'],
-            'description'  => $data['description'],
-            'start_time'   => $data['start_time'],
-            'end_time'     => $data['end_time'],
-            'location'     => $data['location'],
-            'capacity'     => $data['capacity'],
-            'price'        => $data['price'],
-            'online_link'  => $data['online_link'] ?? null,
-            'picture'      => $picturePath,
-        ]);
+$event = Event::create([
+    'organizer_id' => $organizer->id,
+    'name'         => $data['name'],
+    'description'  => $data['description'],
+    'start_time'   => $data['start_time'],
+    'end_time'     => $data['end_time'],
+
+    'city'         => $data['city'],       
+    'location'     => $data['location'],       
+    'venue'        => $data['venue'], 
+    'is_live'      => $data['is_live'] ?? false,
+
+    'capacity'     => $data['capacity'],
+    'price'        => $data['price'],
+    'online_link'  => $data['online_link'] ?? null,
+    'picture'      => $data['picture'] ?? null,
+]);
+
 
         // 👈 ربط الحدث مع الكاتيجوريز في جدول category_event
         if (! empty($data['categories'])) {
@@ -129,21 +142,27 @@ class EventController extends Controller
             ], 403);
         }
 
-        $data = $request->validate([
-            'name'        => ['sometimes', 'string', 'max:255'],
-            'description' => ['sometimes', 'string'],
-            'start_time'  => ['sometimes', 'date'],
-            'end_time'    => ['sometimes', 'date'],
-            'location'    => ['sometimes', 'string', 'max:255'],
-            'capacity'    => ['sometimes', 'integer', 'min:1'],
-            'price'       => ['sometimes', 'numeric', 'min:0'],
-            'online_link' => ['sometimes', 'nullable', 'string', 'max:500'],
-            'picture'     => ['sometimes', 'nullable', 'string'], // base64
+$data = $request->validate([
+    'name'        => ['sometimes', 'string', 'max:255'],
+    'description' => ['sometimes', 'string'],
+    'start_time'  => ['sometimes', 'date'],
+    'end_time'    => ['sometimes', 'date', 'after:start_time'],
 
-            // 👇 جديد: تحديث الكاتيجوريز
-            'categories'   => ['sometimes', 'array'],
-            'categories.*' => ['integer', 'exists:categories,id'],
-        ]);
+    'city'        => ['sometimes', 'string', 'max:255'],  // ✅
+    'location'    => ['sometimes', 'string', 'max:255'],  // ✅
+    'venue'       => ['sometimes', 'string', 'max:255'],  // ✅
+
+    'is_live'     => ['sometimes', 'boolean'],            // ✅
+
+    'capacity'    => ['sometimes', 'integer', 'min:1'],
+    'price'       => ['sometimes', 'numeric', 'min:0'],
+    'online_link' => ['sometimes', 'nullable', 'string', 'max:500'],
+    'picture'     => ['sometimes', 'nullable', 'string'],
+
+    'categories'   => ['sometimes', 'array'],
+    'categories.*' => ['integer', 'exists:categories,id'],
+]);
+
 
         // صورة جديدة لو انبعت
         if (array_key_exists('picture', $data)) {

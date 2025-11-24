@@ -2,17 +2,23 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Event extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'organizer_id',
         'name',
         'description',
         'start_time',
         'end_time',
-        'location',
+        'is_live',    
+        'city',   
+        'location',    
+        'venue',       
         'capacity',
         'price',
         'online_link',
@@ -22,8 +28,7 @@ class Event extends Model
     protected $casts = [
         'start_time' => 'datetime',
         'end_time'   => 'datetime',
-        'price'      => 'decimal:2',
-        'capacity'   => 'integer',
+        'is_live'    => 'boolean',
     ];
 
     public function organizer()
@@ -31,18 +36,8 @@ class Event extends Model
         return $this->belongsTo(User::class, 'organizer_id');
     }
 
-    public function tickets()
-    {
-        return $this->hasMany(Ticket::class);
-    }
-
-    public function volunteerRequests()
-    {
-        return $this->hasMany(\App\Models\VolunteerRequest::class);
-    }
-
     public function categories()
     {
-        return $this->belongsToMany(Category::class, 'category_event');
+        return $this->belongsToMany(Category::class, 'event_category');
     }
 }
