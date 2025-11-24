@@ -10,16 +10,29 @@ class CategorySeeder extends Seeder
     public function run(): void
     {
         $names = [
-            'Information Technology',
-            'Doctor',
-            'Engineering',
+            
+            'Music',
+            'Concert',
+            'Comedy',
+            'Theatre',
+            'Festival',
+            'Art Exhibition',
+            'Sports',
+            'Gaming Event',
+
+            'IT',
+            'Business',
+            'Conference',
+            'Startup Pitch',
+            'Hackathon',
+            'Workshop',
             'Education',
-            'Finance & Accounting',
-            'Media & Marketing',
-            'Hospitality',
-            'Construction',
-            'Student',
-            'Other',
+
+            'Discussion',
+            'Debate',
+            'Community',
+            'Charity',
+            'Book Fair',
         ];
 
         foreach ($names as $name) {

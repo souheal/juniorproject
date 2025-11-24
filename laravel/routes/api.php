@@ -8,7 +8,7 @@ use App\Http\Controllers\Admin\OrganizerRequestAdminController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\User\VolunteerRequestController;
-
+use App\Http\Controllers\Api\CategoryController
 
 // =====================
 // Auth routes (public)
@@ -28,7 +28,8 @@ Route::prefix('auth')->group(function () {
     Route::post('/password/reset', [PasswordResetController::class, 'reset']);
 });
 
-
+Route::get('/events/browse', [EventController::class, 'browse']);
+Route::get('/categories', [CategoryController::class, 'index']);
 // =====================
 // Protected routes
 // =====================

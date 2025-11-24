@@ -9,6 +9,7 @@ use App\Models\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class EventController extends Controller
 {
@@ -73,6 +74,10 @@ class EventController extends Controller
             'price'       => ['required', 'numeric', 'min:0'],
             'online_link' => ['nullable', 'string', 'max:500'],
             'picture'     => ['nullable', 'string'], // base64
+
+            // 👇 جديد: الكاتيجوريز (IDs من جدول categories)
+            'categories'   => ['nullable', 'array'],
+            'categories.*' => ['integer', 'exists:categories,id'],
         ]);
 
         $picturePath = null;
@@ -100,9 +105,14 @@ class EventController extends Controller
             'picture'      => $picturePath,
         ]);
 
+        // 👈 ربط الحدث مع الكاتيجوريز في جدول category_event
+        if (! empty($data['categories'])) {
+            $event->categories()->sync($data['categories']);
+        }
+
         return response()->json([
             'message' => 'Event created successfully',
-            'event'   => $event,
+            'event'   => $event->load('categories:id,name'),
         ], 201);
     }
 
@@ -129,6 +139,10 @@ class EventController extends Controller
             'price'       => ['sometimes', 'numeric', 'min:0'],
             'online_link' => ['sometimes', 'nullable', 'string', 'max:500'],
             'picture'     => ['sometimes', 'nullable', 'string'], // base64
+
+            // 👇 جديد: تحديث الكاتيجوريز
+            'categories'   => ['sometimes', 'array'],
+            'categories.*' => ['integer', 'exists:categories,id'],
         ]);
 
         // صورة جديدة لو انبعت
@@ -148,11 +162,16 @@ class EventController extends Controller
             }
         }
 
-        $original      = $event->getOriginal();
+        $original = $event->getOriginal();
         $event->fill($data);
         $event->save();
 
-        // حقول لو تغيرت نرسل إشعارات
+        // 👈 لو بعت categories حتى لو مصفوفة فاضية، نعمل sync
+        if (array_key_exists('categories', $data)) {
+            $event->categories()->sync($data['categories'] ?? []);
+        }
+
+        // حقول لو تغيرت نرسل إشعارات (لسه ما أضفت categories هنا)
         $watchedFields = ['capacity', 'description', 'start_time', 'end_time', 'picture'];
         $changedFields = [];
 
@@ -168,7 +187,7 @@ class EventController extends Controller
 
         return response()->json([
             'message'        => 'Event updated successfully',
-            'event'          => $event,
+            'event'          => $event->load('categories:id,name'),
             'changed_fields' => $changedFields,
         ]);
     }
@@ -248,5 +267,81 @@ class EventController extends Controller
                 'read_status' => false,
             ]);
         }
+    }
+
+    // =========================
+    // Public / User side: Browse events with filters
+    // =========================
+    public function browse(Request $request)
+    {
+        $query = Event::query()
+            ->with([
+                'organizer:id,name',
+                'categories:id,name',
+            ])
+            ->orderBy('start_time');
+
+        // ----- Location filter (LIKE) -----
+        if ($request->filled('location')) {
+            $location = $request->input('location');
+            $query->where('location', 'ILIKE', '%' . $location . '%');
+        }
+
+        // ----- Category filter (IDs) -----
+        $categoryIds = $request->input('category_ids');
+        if (is_array($categoryIds) && ! empty($categoryIds)) {
+            $query->whereHas('categories', function ($q) use ($categoryIds) {
+                $q->whereIn('categories.id', $categoryIds);
+            });
+        }
+
+        // ----- Price filter -----
+        if ($request->filled('min_price')) {
+            $query->where('price', '>=', $request->input('min_price'));
+        }
+
+        if ($request->filled('max_price')) {
+            $query->where('price', '<=', $request->input('max_price'));
+        }
+
+        // ----- Date filter: anytime / today / tomorrow / this_week / this_month -----
+        $filter = $request->input('date_filter', 'anytime');
+
+        $now        = Carbon::now();
+        $todayStart = $now->copy()->startOfDay();
+        $todayEnd   = $now->copy()->endOfDay();
+
+        switch ($filter) {
+            case 'today':
+                $query->whereBetween('start_time', [$todayStart, $todayEnd]);
+                break;
+
+            case 'tomorrow':
+                $start = $todayStart->copy()->addDay();
+                $end   = $todayEnd->copy()->addDay();
+                $query->whereBetween('start_time', [$start, $end]);
+                break;
+
+            case 'this_week':
+                $start = $todayStart;
+                $end   = $now->copy()->endOfWeek();
+                $query->whereBetween('start_time', [$start, $end]);
+                break;
+
+            case 'this_month':
+                $start = $todayStart;
+                $end   = $now->copy()->endOfMonth();
+                $query->whereBetween('start_time', [$start, $end]);
+                break;
+
+            case 'anytime':
+            default:
+                $query->where('start_time', '>=', $now);
+                break;
+        }
+
+        $events = $query->get();
+
+        return response()->json($events);
     }
 }

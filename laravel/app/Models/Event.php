@@ -37,8 +37,12 @@ class Event extends Model
     }
 
     public function volunteerRequests()
-    {   
+    {
         return $this->hasMany(\App\Models\VolunteerRequest::class);
     }
 
+    public function categories()
+    {
+        return $this->belongsToMany(Category::class, 'category_event');
+    }
 }
