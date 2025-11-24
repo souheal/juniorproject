@@ -4,363 +4,452 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Event;
+use App\Models\Category;
 use App\Models\Ticket;
-use App\Models\Notification;
+use App\Models\VolunteerRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Carbon\Carbon;
 
 class EventController extends Controller
 {
-    // =========================
-    // Helpers
-    // =========================
-
+    /**
+     * Helper: ensure the current user is an organizer.
+     */
     protected function requireOrganizer(Request $request)
     {
         $user = $request->user();
 
-        if (! $user || ! $user->role || $user->role->name !== 'organizer') {
+        if (!$user || !$user->role || $user->role->name !== 'organizer') {
             abort(response()->json([
-                'message' => 'Only organizers can create or update events',
+                'message' => 'Only organizers can perform this action.',
             ], 403));
         }
 
         return $user;
     }
 
+    /**
+     * Helper: ensure the current user is an admin.
+     */
     protected function requireAdmin(Request $request)
     {
         $user = $request->user();
 
-        if (! $user || ! $user->role || $user->role->name !== 'admin') {
+        if (!$user || !$user->role || $user->role->name !== 'admin') {
             abort(response()->json([
-                'message' => 'Only admin can delete events',
+                'message' => 'Only admins can perform this action.',
             ], 403));
         }
 
         return $user;
     }
 
+    /**
+     * Compute whether an event is live right now based on its start/end time.
+     */
+    protected function computeIsLive(Event $event): bool
+    {
+        if (!$event->start_time || !$event->end_time) {
+            return false;
+        }
+
+        $now = now();
+
+        return $now->greaterThanOrEqualTo($event->start_time)
+            && $now->lessThanOrEqualTo($event->end_time);
+    }
+
+    /**
+     * Attach smart fields: is_live (time-based) + full_location.
+     */
+    protected function addLocationAndLiveInfo(Event $event): void
+    {
+        // Always recompute is_live from time window (ignore any client input)
+        $event->is_live = $this->computeIsLive($event);
+
+        // Combine city + location + venue for convenient display/search
+        $pieces = array_filter([
+            $event->city,
+            $event->location,
+            $event->venue,
+        ], fn ($v) => !is_null($v) && $v !== '');
+
+        $event->full_location = implode(' - ', $pieces);
+    }
+
+    /**
+     * Apply addLocationAndLiveInfo on a model / collection / paginator.
+     */
+    protected function transformEvents($events)
+    {
+        if ($events instanceof \Illuminate\Pagination\AbstractPaginator) {
+            $events->getCollection()->transform(function (Event $event) {
+                $this->addLocationAndLiveInfo($event);
+                return $event;
+            });
+        } elseif ($events instanceof \Illuminate\Support\Collection) {
+            $events->transform(function (Event $event) {
+                $this->addLocationAndLiveInfo($event);
+                return $event;
+            });
+        } elseif ($events instanceof Event) {
+            $this->addLocationAndLiveInfo($events);
+        }
+
+        return $events;
+    }
+
     // =========================
-    // Organizer side
+    // Admin / Organizer listing
     // =========================
 
-    // قائمة أحداث المنظّم نفسه
+    /**
+     * Admin/Organizer events list with basic filters.
+     * - Admin: sees all events.
+     * - Organizer: sees only own events.
+     */
     public function index(Request $request)
     {
-        $organizer = $this->requireOrganizer($request);
+        $user = $request->user();
 
-        $events = Event::where('organizer_id', $organizer->id)
-            ->orderByDesc('start_time')
-            ->get();
+        $query = Event::with(['organizer:id,name', 'categories:id,name']);
+
+        if ($user && $user->role && $user->role->name === 'organizer') {
+            $query->where('organizer_id', $user->id);
+        }
+
+        // Filter by status (published/draft)
+        $status = $request->input('status');
+        if ($status === 'published') {
+            $query->where('is_published', true);
+        } elseif ($status === 'draft') {
+            $query->where('is_published', false);
+        }
+
+        // Date range filter
+        if ($request->filled('date_from')) {
+            $query->whereDate('start_time', '>=', $request->input('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('start_time', '<=', $request->input('date_to'));
+        }
+
+        // Search by name or location pieces
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'ILIKE', '%' . $search . '%')
+                  ->orWhere('city', 'ILIKE', '%' . $search . '%')
+                  ->orWhere('location', 'ILIKE', '%' . $search . '%')
+                  ->orWhere('venue', 'ILIKE', '%' . $search . '%');
+            });
+        }
+
+        $events = $query
+            ->orderBy('start_time', 'asc')
+            ->paginate($request->integer('per_page', 10));
+
+        $events = $this->transformEvents($events);
 
         return response()->json($events);
     }
 
-    // إنشاء event جديد (organizer only)
+    // ============
+    // Create event
+    // ============
+
     public function store(Request $request)
     {
         $organizer = $this->requireOrganizer($request);
 
-$data = $request->validate([
-    'name'        => ['required', 'string', 'max:255'],
-    'description' => ['required', 'string'],
-    'start_time'  => ['required', 'date'],
-    'end_time'    => ['required', 'date', 'after:start_time'],
+        $data = $request->validate([
+            'name'        => ['required', 'string', 'max:255'],
+            'description' => ['required', 'string'],
 
-    'city'        => ['required', 'string', 'max:255'],
-    'location'    => ['required', 'string', 'max:255'],  
-    'venue'       => ['required', 'string', 'max:255'],  
+            'start_time'  => ['required', 'date', 'after:now'],
+            'end_time'    => ['required', 'date', 'after:start_time'],
 
-    'is_live'     => ['sometimes', 'boolean'],           
+            // NEW: city / location / venue
+            'city'        => ['required', 'string', 'max:255'],
+            'location'    => ['required', 'string', 'max:255'], // area/district
+            'venue'       => ['nullable', 'string', 'max:255'], // building / hotel / stadium
 
-    'capacity'    => ['required', 'integer', 'min:1'],
-    'price'       => ['required', 'numeric', 'min:0'],
-    'online_link' => ['nullable', 'string', 'max:500'],
-    'picture'     => ['nullable', 'string'], // base64
+            'capacity'    => ['required', 'integer', 'min:1'],
+            'price'       => ['required', 'numeric', 'min:0'],
 
-    // categories (IDs from categories table)
-    'categories'   => ['required', 'array'],
-    'categories.*' => ['integer', 'exists:categories,id'],
-]);
+            'online_link' => ['nullable', 'url'],
 
+            // Base64 image: data:image/jpeg;base64,...
+            'picture'     => ['nullable', 'string'],
 
+            // Categories (pivot: category_event)
+            'categories'   => ['required', 'array', 'min:1'],
+            'categories.*' => ['integer', 'exists:categories,id'],
+        ]);
+
+        // Handle base64 image (optional)
         $picturePath = null;
-
-        if (! empty($data['picture'])) {
-            $binary = base64_decode($data['picture']);
-            if ($binary !== false) {
-                $filename = 'event_' . Str::uuid()->toString() . '.jpg';
-                $path = 'events/' . $filename;
-                Storage::disk('public')->put($path, $binary);
-                $picturePath = $path;
-            }
+        if (!empty($data['picture'])) {
+            $picturePath = $this->saveBase64Image($data['picture'], 'events');
         }
 
-$event = Event::create([
-    'organizer_id' => $organizer->id,
-    'name'         => $data['name'],
-    'description'  => $data['description'],
-    'start_time'   => $data['start_time'],
-    'end_time'     => $data['end_time'],
+        $event = Event::create([
+            'organizer_id' => $organizer->id,
+            'name'         => $data['name'],
+            'description'  => $data['description'],
+            'start_time'   => $data['start_time'],
+            'end_time'     => $data['end_time'],
 
-    'city'         => $data['city'],       
-    'location'     => $data['location'],       
-    'venue'        => $data['venue'], 
-    'is_live'      => $data['is_live'] ?? false,
+            'city'         => $data['city'],
+            'location'     => $data['location'],
+            'venue'        => $data['venue'] ?? null,
 
-    'capacity'     => $data['capacity'],
-    'price'        => $data['price'],
-    'online_link'  => $data['online_link'] ?? null,
-    'picture'      => $data['picture'] ?? null,
-]);
+            'capacity'     => $data['capacity'],
+            'price'        => $data['price'],
+            'online_link'  => $data['online_link'] ?? null,
+            'picture'      => $picturePath,
 
+            // new events start as draft; you can change this logic if needed
+            'is_published' => false,
 
-        // 👈 ربط الحدث مع الكاتيجوريز في جدول category_event
-        if (! empty($data['categories'])) {
-            $event->categories()->sync($data['categories']);
-        }
+            // we store some value, but in responses we always recompute from time
+            'is_live'      => false,
+        ]);
+
+        // Sync categories
+        $event->categories()->sync($data['categories']);
+
+        $this->addLocationAndLiveInfo($event);
 
         return response()->json([
-            'message' => 'Event created successfully',
-            'event'   => $event->load('categories:id,name'),
+            'message' => 'Event created successfully.',
+            'event'   => $event,
         ], 201);
     }
 
-    // تعديل event (organizer فقط، ولازم يكون صاحب الحدث)
+    // ============
+    // Update event
+    // ============
+
     public function update(Request $request, $id)
     {
-        $organizer = $this->requireOrganizer($request);
+        $user  = $request->user();
+        $event = Event::with('categories')->findOrFail($id);
 
-        $event = Event::findOrFail($id);
-
-        if ($event->organizer_id !== $organizer->id) {
+        // Authorization: organizer who owns it OR admin
+        if (
+            !$user ||
+            !$user->role ||
+            !(
+                ($user->role->name === 'admin') ||
+                ($user->role->name === 'organizer' && $event->organizer_id == $user->id)
+            )
+        ) {
             return response()->json([
-                'message' => 'You can only update your own events',
+                'message' => 'You are not allowed to update this event.',
             ], 403);
         }
 
-$data = $request->validate([
-    'name'        => ['sometimes', 'string', 'max:255'],
-    'description' => ['sometimes', 'string'],
-    'start_time'  => ['sometimes', 'date'],
-    'end_time'    => ['sometimes', 'date', 'after:start_time'],
+        $data = $request->validate([
+            'name'        => ['sometimes', 'string', 'max:255'],
+            'description' => ['sometimes', 'string'],
 
-    'city'        => ['sometimes', 'string', 'max:255'],  // ✅
-    'location'    => ['sometimes', 'string', 'max:255'],  // ✅
-    'venue'       => ['sometimes', 'string', 'max:255'],  // ✅
+            'start_time'  => ['sometimes', 'date', 'after:now'],
+            'end_time'    => ['sometimes', 'date', 'after:start_time'],
 
-    'is_live'     => ['sometimes', 'boolean'],            // ✅
+            'city'        => ['sometimes', 'string', 'max:255'],
+            'location'    => ['sometimes', 'string', 'max:255'],
+            'venue'       => ['sometimes', 'nullable', 'string', 'max:255'],
 
-    'capacity'    => ['sometimes', 'integer', 'min:1'],
-    'price'       => ['sometimes', 'numeric', 'min:0'],
-    'online_link' => ['sometimes', 'nullable', 'string', 'max:500'],
-    'picture'     => ['sometimes', 'nullable', 'string'],
+            'capacity'    => ['sometimes', 'integer', 'min:1'],
+            'price'       => ['sometimes', 'numeric', 'min:0'],
 
-    'categories'   => ['sometimes', 'array'],
-    'categories.*' => ['integer', 'exists:categories,id'],
-]);
+            'online_link' => ['sometimes', 'nullable', 'url'],
+            'picture'     => ['sometimes', 'nullable', 'string'],
 
+            'categories'   => ['sometimes', 'array'],
+            'categories.*' => ['integer', 'exists:categories,id'],
 
-        // صورة جديدة لو انبعت
+            'is_published' => ['sometimes', 'boolean'],
+        ]);
+
+        // Update simple attributes
+        $event->fill($data);
+
+        // Handle base64 image change (if provided)
         if (array_key_exists('picture', $data)) {
             if ($data['picture']) {
-                $binary = base64_decode($data['picture']);
-                if ($binary !== false) {
-                    $filename = 'event_' . Str::uuid()->toString() . '.jpg';
-                    $path = 'events/' . $filename;
-                    Storage::disk('public')->put($path, $binary);
-                    $data['picture'] = $path;
-                } else {
-                    unset($data['picture']);
+                // delete old file if exists
+                if ($event->picture && Storage::disk('public')->exists($event->picture)) {
+                    Storage::disk('public')->delete($event->picture);
                 }
+
+                $event->picture = $this->saveBase64Image($data['picture'], 'events');
             } else {
-                $data['picture'] = null;
+                // null picture: delete old
+                if ($event->picture && Storage::disk('public')->exists($event->picture)) {
+                    Storage::disk('public')->delete($event->picture);
+                }
+                $event->picture = null;
             }
         }
 
-        $original = $event->getOriginal();
-        $event->fill($data);
         $event->save();
 
-        // 👈 لو بعت categories حتى لو مصفوفة فاضية، نعمل sync
-        if (array_key_exists('categories', $data)) {
-            $event->categories()->sync($data['categories'] ?? []);
+        // Sync categories if provided
+        if (isset($data['categories'])) {
+            $event->categories()->sync($data['categories']);
         }
 
-        // حقول لو تغيرت نرسل إشعارات (لسه ما أضفت categories هنا)
-        $watchedFields = ['capacity', 'description', 'start_time', 'end_time', 'picture'];
-        $changedFields = [];
-
-        foreach ($watchedFields as $field) {
-            if (array_key_exists($field, $event->getChanges())) {
-                $changedFields[] = $field;
-            }
-        }
-
-        if (! empty($changedFields)) {
-            $this->notifyEventUpdated($event, $changedFields);
-        }
+        $this->addLocationAndLiveInfo($event);
 
         return response()->json([
-            'message'        => 'Event updated successfully',
-            'event'          => $event->load('categories:id,name'),
-            'changed_fields' => $changedFields,
+            'message' => 'Event updated successfully.',
+            'event'   => $event,
         ]);
     }
 
-    // =========================
-    // Admin side (delete فقط)
-    // =========================
+    // ============
+    // Delete event
+    // ============
 
     public function destroy(Request $request, $id)
     {
-        $this->requireAdmin($request);
-
+        $user  = $request->user();
         $event = Event::findOrFail($id);
 
-        // إشعار إلغاء قبل الحذف
-        $this->notifyEventCancelled($event);
+        if (
+            !$user ||
+            !$user->role ||
+            !(
+                ($user->role->name === 'admin') ||
+                ($user->role->name === 'organizer' && $event->organizer_id == $user->id)
+            )
+        ) {
+            return response()->json([
+                'message' => 'You are not allowed to delete this event.',
+            ], 403);
+        }
 
+        // Optional: prevent deletion if tickets or volunteer requests exist
+        $hasTickets = Ticket::where('event_id', $event->id)->exists();
+        $hasVolunteers = VolunteerRequest::where('event_id', $event->id)->exists();
+
+        if ($hasTickets || $hasVolunteers) {
+            return response()->json([
+                'message' => 'Cannot delete event that has tickets or volunteers.',
+            ], 422);
+        }
+
+        // Delete picture file if exists
+        if ($event->picture && Storage::disk('public')->exists($event->picture)) {
+            Storage::disk('public')->delete($event->picture);
+        }
+
+        $event->categories()->detach();
         $event->delete();
 
         return response()->json([
-            'message' => 'Event deleted and users notified (if they had tickets)',
+            'message' => 'Event deleted successfully.',
         ]);
     }
 
-    // =========================
-    // Notifications helpers
-    // =========================
+    // ======================
+    // Public browse endpoint
+    // ======================
 
-    protected function notifyEventUpdated(Event $event, array $changedFields)
-    {
-        $tickets = Ticket::where('event_id', $event->id)->with('user')->get();
-
-        if ($tickets->isEmpty()) {
-            return;
-        }
-
-        $fieldLabels = [
-            'capacity'    => 'capacity',
-            'description' => 'description',
-            'start_time'  => 'start time',
-            'end_time'    => 'end time',
-            'picture'     => 'picture',
-        ];
-
-        $labels      = array_map(fn ($f) => $fieldLabels[$f] ?? $f, $changedFields);
-        $changedText = implode(', ', $labels);
-
-        foreach ($tickets as $ticket) {
-            if (! $ticket->user) {
-                continue;
-            }
-
-            Notification::create([
-                'user_id'     => $ticket->user_id,
-                'event_id'    => $event->id,
-                'type'        => 'event_updated',
-                'content'     => 'Event "' . $event->name . '" has been updated: ' . $changedText,
-                'read_status' => false,
-            ]);
-        }
-    }
-
-    protected function notifyEventCancelled(Event $event)
-    {
-        $tickets = Ticket::where('event_id', $event->id)->with('user')->get();
-
-        foreach ($tickets as $ticket) {
-            if (! $ticket->user) {
-                continue;
-            }
-
-            Notification::create([
-                'user_id'     => $ticket->user_id,
-                'event_id'    => $event->id,
-                'type'        => 'event_cancelled',
-                'content'     => 'Event "' . $event->name . '" has been cancelled.',
-                'read_status' => false,
-            ]);
-        }
-    }
-
-    // =========================
-    // Public / User side: Browse events with filters
-    // =========================
     public function browse(Request $request)
     {
-        $query = Event::query()
-            ->with([
-                'organizer:id,name',
-                'categories:id,name',
-            ])
-            ->orderBy('start_time');
+        $query = Event::with(['organizer:id,name', 'categories:id,name'])
+            ->where('is_published', true)
+            ->whereDate('start_time', '>=', now()->startOfDay());
 
-        // ----- Location filter (LIKE) -----
-        if ($request->filled('location')) {
-            $location = $request->input('location');
-            $query->where('location', 'ILIKE', '%' . $location . '%');
-        }
-
-        // ----- Category filter (IDs) -----
-        $categoryIds = $request->input('category_ids');
-        if (is_array($categoryIds) && ! empty($categoryIds)) {
-            $query->whereHas('categories', function ($q) use ($categoryIds) {
-                $q->whereIn('categories.id', $categoryIds);
+        // Filter by category
+        if ($categoryId = $request->input('category_id')) {
+            $query->whereHas('categories', function ($q) use ($categoryId) {
+                $q->where('categories.id', $categoryId);
             });
         }
 
-        // ----- Price filter -----
-        if ($request->filled('min_price')) {
-            $query->where('price', '>=', $request->input('min_price'));
+        // Filter by city
+        if ($city = $request->input('city')) {
+            $query->where('city', 'ILIKE', '%' . $city . '%');
         }
 
-        if ($request->filled('max_price')) {
-            $query->where('price', '<=', $request->input('max_price'));
+        // Unified "place" filter: matches city OR location OR venue
+        if ($place = $request->input('place')) {
+            $query->where(function ($q) use ($place) {
+                $q->where('city', 'ILIKE', '%' . $place . '%')
+                  ->orWhere('location', 'ILIKE', '%' . $place . '%')
+                  ->orWhere('venue', 'ILIKE', '%' . $place . '%');
+            });
         }
 
-        // ----- Date filter: anytime / today / tomorrow / this_week / this_month -----
-        $filter = $request->input('date_filter', 'anytime');
-
-        $now        = Carbon::now();
-        $todayStart = $now->copy()->startOfDay();
-        $todayEnd   = $now->copy()->endOfDay();
-
-        switch ($filter) {
-            case 'today':
-                $query->whereBetween('start_time', [$todayStart, $todayEnd]);
-                break;
-
-            case 'tomorrow':
-                $start = $todayStart->copy()->addDay();
-                $end   = $todayEnd->copy()->addDay();
-                $query->whereBetween('start_time', [$start, $end]);
-                break;
-
-            case 'this_week':
-                $start = $todayStart;
-                $end   = $now->copy()->endOfWeek();
-                $query->whereBetween('start_time', [$start, $end]);
-                break;
-
-            case 'this_month':
-                $start = $todayStart;
-                $end   = $now->copy()->endOfMonth();
-                $query->whereBetween('start_time', [$start, $end]);
-                break;
-
-            case 'anytime':
-            default:
-                $query->where('start_time', '>=', $now);
-                break;
+        // Date filter (specific day)
+        if ($date = $request->input('date')) {
+            $query->whereDate('start_time', $date);
         }
 
-        $events = $query->get();
+        // Only currently live events (based on time)
+        if ($request->boolean('live_only')) {
+            $now = now();
+            $query->where('start_time', '<=', $now)
+                  ->where('end_time', '>=', $now);
+        }
+
+        // General search across name + all location fields
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'ILIKE', '%' . $search . '%')
+                  ->orWhere('city', 'ILIKE', '%' . $search . '%')
+                  ->orWhere('location', 'ILIKE', '%' . $search . '%')
+                  ->orWhere('venue', 'ILIKE', '%' . $search . '%');
+            });
+        }
+
+        $events = $query
+            ->orderBy('start_time', 'asc')
+            ->paginate($request->integer('per_page', 10));
+
+        $events = $this->transformEvents($events);
 
         return response()->json($events);
+    }
+
+    // =================
+    // Helper: save image
+    // =================
+
+    /**
+     * Save a base64 image string (data:image/xxx;base64,...) to storage.
+     * Returns the stored relative path (e.g. "events/abcdef.jpg").
+     */
+    protected function saveBase64Image(string $base64, string $folder): string
+    {
+        if (!str_starts_with($base64, 'data:image')) {
+            throw new \InvalidArgumentException('Invalid image data.');
+        }
+
+        // Split header and data
+        [$header, $encoded] = explode(',', $base64, 2);
+
+        // Extract extension from header
+        if (preg_match('/data:image\/(\w+);base64/', $header, $matches)) {
+            $extension = strtolower($matches[1]);
+        } else {
+            $extension = 'jpg';
+        }
+
+        $binary = base64_decode($encoded);
+
+        if ($binary === false) {
+            throw new \RuntimeException('Failed to decode base64 image.');
+        }
+
+        $fileName = $folder . '/' . Str::uuid()->toString() . '.' . $extension;
+
+        Storage::disk('public')->put($fileName, $binary);
+
+        return $fileName;
     }
 }
