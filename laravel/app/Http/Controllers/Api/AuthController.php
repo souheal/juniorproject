@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
+use App\Mail\VerifyEmailMail;
+use App\Mail\NewLoginMail;
 
 class AuthController extends Controller
 {
@@ -80,7 +82,7 @@ class AuthController extends Controller
                 }
 
                 $fileName = Str::uuid()->toString() . '.' . $extension;
-                $path = 'profile_pictures/' . $fileName;
+                $path     = 'profile_pictures/' . $fileName;
 
                 Storage::disk('public')->put($path, $binary);
 
@@ -121,84 +123,110 @@ class AuthController extends Controller
             }
         });
 
-        // 5) Try to send verification email (but DO NOT break if it fails)
-        try {
-            // Put your actual mailable here if you have one, for example:
-            // Mail::to($user->email)->send(new \App\Mail\VerifyEmailMail($user));
+        // 5) Generate email verification token & save it on the user
+        $token = Str::random(64);
+        $user->email_verification_token = $token;
+        $user->save();
 
+        // 6) Build verification URL
+        $verificationUrl = url('/api/auth/verify-email?token=' . $token);
+
+        // 7) Try to send verification email (but DO NOT break if it fails)
+        try {
+            Mail::to($user->email)->send(new VerifyEmailMail($user, $token));
         } catch (\Throwable $e) {
             Log::error('Failed to send verification email', [
                 'user_id' => $user->id,
                 'email'   => $user->email,
                 'error'   => $e->getMessage(),
             ]);
-            // Do NOT rethrow; let registration succeed
+            // لا نرمي الاستثناء، التسجيل لازم يكمل عادي
         }
 
         return response()->json([
-            'message' => 'User registered successfully',
-            'user'    => $user,
+            'message'          => 'User registered successfully',
+            'verification_url' => $verificationUrl,  // 👈 هي اللي كنت ناقصتك
+            'user'             => $user,
         ], 201);
     }
-    
 
-public function login(Request $request)
-{
-    $credentials = $request->validate([
-        'email' => ['required', 'email'],
-        'password' => ['required', 'string'],
-    ]);
+    public function login(Request $request)
+    {
+        $data = $request->validate([
+            'email'    => ['required', 'email'],
+            'password' => ['required', 'string', 'min:6'],
+        ]);
 
-    $user = User::where('email', $credentials['email'])->first();
+        $user = User::where('email', $data['email'])->first();
 
-    if (! $user || ! Hash::check($credentials['password'], $user->password)) {
+        if (! $user || ! Hash::check($data['password'], $user->password)) {
+            return response()->json([
+                'message' => 'Invalid email or password',
+            ], 401);
+        }
+
+        // لازم يكون الإيميل مفعَّل
+        if ($user->email_verified_at === null) {
+            return response()->json([
+                'message' => 'Email is not verified',
+            ], 403);
+        }
+
+        // نحدد الـ IP الحالي
+        $currentIp   = $request->ip();
+        $isNewDevice = $user->last_login_ip !== $currentIp;
+
+        // نخزّن آخر IP
+        $user->last_login_ip = $currentIp;
+        $user->save();
+
+        // نمسح التوكنات القديمة (اختياري بس أنظف)
+        $user->tokens()->delete();
+
+        // نولّد توكن جديد لـ Sanctum
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        // لو IP جديد → نبعت إيميل
+        if ($isNewDevice) {
+            Mail::to($user->email)->send(new NewLoginMail($user, $currentIp));
+        }
+
         return response()->json([
-            'message' => 'These credentials do not match our records.',
-        ], 401);
+            'message' => 'Login successful',
+            'user'    => $user,
+            'token'   => $token,
+        ]);
     }
 
-    return response()->json([
-        'message' => 'Login successful',
-        'user' => [
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-        ],
-    ], 200);
-}
+    public function verifyEmail(Request $request)
+    {
+        $request->validate([
+            'token' => ['required', 'string'],
+        ]);
 
+        $user = User::where('email_verification_token', $request->token)->first();
 
-public function verifyEmail(Request $request)
-{
-    $request->validate([
-        'token' => ['required', 'string'],
-    ]);
+        if (! $user) {
+            return response()->json([
+                'message' => 'Invalid or expired verification token',
+            ], 400);
+        }
 
-    $user = User::where('email_verification_token', $request->token)->first();
+        // لو هو أصلاً مفعّل
+        if ($user->email_verified_at !== null) {
+            return response()->json([
+                'message' => 'Email is already verified',
+            ], 200);
+        }
 
-    if (! $user) {
+        $user->email_verified_at      = now();
+        $user->email_verification_token = null;
+        $user->save();
+
         return response()->json([
-            'message' => 'Invalid or expired verification token',
-        ], 400);
-    }
-
-    // لو هو أصلاً مفعّل
-    if ($user->email_verified_at !== null) {
-        return response()->json([
-            'message' => 'Email is already verified',
+            'message' => 'Email verified successfully',
         ], 200);
     }
-
-    $user->email_verified_at = now();
-    $user->email_verification_token = null;
-    $user->save();
-
-    return response()->json([
-        'message' => 'Email verified successfully',
-    ], 200);
-}
-
-
 
     /**
      * Logout (for Sanctum)
@@ -217,4 +245,3 @@ public function verifyEmail(Request $request)
         ]);
     }
 }
-
