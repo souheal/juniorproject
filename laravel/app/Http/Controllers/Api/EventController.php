@@ -68,11 +68,10 @@ class EventController extends Controller
         // Always recompute is_live from time window (ignore any client input)
         $event->is_live = $this->computeIsLive($event);
 
-        // Combine city + location + venue for convenient display/search
+        // Combine city + location for convenient display/search
         $pieces = array_filter([
             $event->city,
             $event->location,
-            $event->venue,
         ], fn ($v) => !is_null($v) && $v !== '');
 
         $event->full_location = implode(' - ', $pieces);
@@ -361,7 +360,6 @@ class EventController extends Controller
     public function browse(Request $request)
     {
         $query = Event::with(['organizer:id,name', 'categories:id,name'])
-            ->where('is_published', true)
             ->whereDate('start_time', '>=', now()->startOfDay());
 
         // Filter by category
@@ -376,12 +374,11 @@ class EventController extends Controller
             $query->where('city', 'ILIKE', '%' . $city . '%');
         }
 
-        // Unified "place" filter: matches city OR location OR venue
+        // Unified "place" filter: matches city OR location
         if ($place = $request->input('place')) {
             $query->where(function ($q) use ($place) {
                 $q->where('city', 'ILIKE', '%' . $place . '%')
-                  ->orWhere('location', 'ILIKE', '%' . $place . '%')
-                  ->orWhere('venue', 'ILIKE', '%' . $place . '%');
+                  ->orWhere('location', 'ILIKE', '%' . $place . '%');
             });
         }
 
@@ -402,8 +399,7 @@ class EventController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'ILIKE', '%' . $search . '%')
                   ->orWhere('city', 'ILIKE', '%' . $search . '%')
-                  ->orWhere('location', 'ILIKE', '%' . $search . '%')
-                  ->orWhere('venue', 'ILIKE', '%' . $search . '%');
+                  ->orWhere('location', 'ILIKE', '%' . $search . '%');
             });
         }
 

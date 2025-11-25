@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'home_screen.dart';
 import '../services/api_client.dart';
+import '../models/category_api_model.dart';
 
 enum AuthMode { signIn, signUp }
 
@@ -50,24 +51,19 @@ class _AuthScreenState extends State<AuthScreen> {
     'Palmyra',
   ];
 
-  static const List<String> _categories = [
-    'Information Technology',
-    'Doctor',
-    'Engineering',
-    'Education',
-    'Finance & Accounting',
-    'Media & Marketing',
-    'Hospitality',
-    'Construction',
-    'Student',
-    'Other',
-  ];
-
   AuthMode _mode = AuthMode.signIn;
   bool _isSubmitting = false;
+  bool _isLoadingCategories = false;
   Uint8List? _profileImageBytes;
   String? _selectedCity;
-  String? _selectedCategory;
+  List<CategoryApiModel> _categories = [];
+  List<CategoryApiModel> _selectedCategories = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchCategories();
+  }
 
   @override
   void dispose() {
@@ -78,6 +74,36 @@ class _AuthScreenState extends State<AuthScreen> {
     _confirmPasswordController.dispose();
     _birthDateController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchCategories() async {
+    setState(() => _isLoadingCategories = true);
+
+    try {
+      final response = await ApiClient.getCategories();
+
+      if (response.statusCode == 200) {
+        final List<dynamic> jsonList = json.decode(response.body);
+        final categories = jsonList
+            .map((json) => CategoryApiModel.fromJson(json))
+            .toList();
+
+        if (mounted) {
+          setState(() {
+            _categories = categories;
+            _isLoadingCategories = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() => _isLoadingCategories = false);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingCategories = false);
+      }
+    }
   }
 
   void _switchMode(AuthMode mode) {
@@ -99,7 +125,7 @@ class _AuthScreenState extends State<AuthScreen> {
     _confirmPasswordController.clear();
     _birthDateController.clear();
     _selectedCity = null;
-    _selectedCategory = null;
+    _selectedCategories = [];
     _profileImageBytes = null;
     _formKey.currentState?.reset();
   }
@@ -225,7 +251,7 @@ class _AuthScreenState extends State<AuthScreen> {
           'password': _passwordController.text,
           'password_confirmation': _confirmPasswordController.text,
           'picture': null, // For now, send null (or base64 string if needed)
-          'categories': [_selectedCategory ?? ''],
+          'categories': _selectedCategories.map((c) => c.name).toList(),
         };
 
         // Call the API
@@ -348,13 +374,37 @@ class _AuthScreenState extends State<AuthScreen> {
               backgroundColor: Colors.red,
             ),
           );
-        } else {
+        } else if (response.statusCode == 403) {
+          // Email not verified
+          final data = json.decode(response.body);
+          final message = data['message'] ?? 'Email is not verified';
+
           setState(() => _isSubmitting = false);
 
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Something went wrong. Please try again.'),
+            SnackBar(
+              content: Text(message),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        } else {
+          setState(() => _isSubmitting = false);
+
+          // Try to get error message from response
+          String errorMessage = 'Something went wrong. Please try again.';
+          try {
+            final data = json.decode(response.body);
+            if (data['message'] != null) {
+              errorMessage = data['message'];
+            }
+          } catch (_) {}
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('$errorMessage (Status: ${response.statusCode})'),
               backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
             ),
           );
         }
@@ -460,14 +510,61 @@ class _AuthScreenState extends State<AuthScreen> {
     return null;
   }
 
-  String? _validateCategory(String? value) {
-    if (_mode != AuthMode.signUp) {
-      return null;
-    }
-    if (value == null || value.isEmpty) {
-      return 'Please select a category';
-    }
-    return null;
+  Future<void> _showCategoryDialog() async {
+    final List<CategoryApiModel> tempSelected = List.from(_selectedCategories);
+
+    await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Select Categories'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _categories.length,
+                  itemBuilder: (context, index) {
+                    final category = _categories[index];
+                    final isSelected = tempSelected.any((c) => c.id == category.id);
+
+                    return CheckboxListTile(
+                      title: Text(category.name),
+                      value: isSelected,
+                      onChanged: (bool? checked) {
+                        setState(() {
+                          if (checked == true) {
+                            tempSelected.add(category);
+                          } else {
+                            tempSelected.removeWhere((c) => c.id == category.id);
+                          }
+                        });
+                      },
+                    );
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    this.setState(() {
+                      _selectedCategories = tempSelected;
+                    });
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Done'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   String? _validateBirthDate(String? value) {
@@ -654,25 +751,30 @@ class _AuthScreenState extends State<AuthScreen> {
                                       validator: _validateCity,
                                     ),
                                     const SizedBox(height: 12),
-                                    DropdownButtonFormField<String>(
-                                      isExpanded: true,
-                                      initialValue: _selectedCategory,
-                                      items: _categories
-                                          .map(
-                                            (category) => DropdownMenuItem(
-                                              value: category,
-                                              child: Text(category),
-                                            ),
-                                          )
-                                          .toList(),
-                                      decoration: _fieldDecoration(
-                                        label: 'Category',
-                                        icon: Icons.work_outline,
+                                    // Category Multi-Select Field
+                                    GestureDetector(
+                                      onTap: _isLoadingCategories ? null : _showCategoryDialog,
+                                      child: AbsorbPointer(
+                                        child: TextFormField(
+                                          decoration: _fieldDecoration(
+                                            label: 'Categories (tap to select)',
+                                            icon: Icons.category_outlined,
+                                          ),
+                                          controller: TextEditingController(
+                                            text: _selectedCategories.isEmpty
+                                                ? ''
+                                                : _selectedCategories
+                                                    .map((c) => c.name)
+                                                    .join(', '),
+                                          ),
+                                          validator: (value) {
+                                            if (_selectedCategories.isEmpty) {
+                                              return 'Please select at least one category';
+                                            }
+                                            return null;
+                                          },
+                                        ),
                                       ),
-                                      onChanged: (value) => setState(
-                                        () => _selectedCategory = value,
-                                      ),
-                                      validator: _validateCategory,
                                     ),
                                     const SizedBox(height: 12),
                                     TextFormField(

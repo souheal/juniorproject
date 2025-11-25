@@ -17,6 +17,7 @@ class EventsApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Events Onboarding',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6A62FF)),
         textTheme: GoogleFonts.poppinsTextTheme(),
