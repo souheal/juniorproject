@@ -86,11 +86,22 @@ class _AuthScreenState extends State<AuthScreen> {
     }
     setState(() {
       _mode = mode;
-      if (mode == AuthMode.signIn) {
-        _selectedCity = null;
-        _selectedCategory = null;
-      }
+      // Clear all form fields when switching modes
+      _clearAllFields();
     });
+  }
+
+  void _clearAllFields() {
+    _nameController.clear();
+    _phoneController.clear();
+    _emailController.clear();
+    _passwordController.clear();
+    _confirmPasswordController.clear();
+    _birthDateController.clear();
+    _selectedCity = null;
+    _selectedCategory = null;
+    _profileImageBytes = null;
+    _formKey.currentState?.reset();
   }
 
   void _handleBack() {
@@ -233,15 +244,7 @@ class _AuthScreenState extends State<AuthScreen> {
           // Clear all form fields after successful signup
           setState(() {
             _isSubmitting = false;
-            _nameController.clear();
-            _phoneController.clear();
-            _emailController.clear();
-            _passwordController.clear();
-            _confirmPasswordController.clear();
-            _birthDateController.clear();
-            _selectedCity = null;
-            _selectedCategory = null;
-            _profileImageBytes = null;
+            _clearAllFields();
           });
 
           // Show success message

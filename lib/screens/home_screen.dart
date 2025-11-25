@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../navigation/bottom_nav.dart';
+import 'auth_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -9,10 +11,23 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _currentNavIndex = 0;
-
   @override
   Widget build(BuildContext context) {
+    // Use the new MainNavigation with all tabs
+    return MainNavigation(
+      onLogout: () {
+        // Navigate back to auth screen on logout
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const AuthScreen()),
+        );
+      },
+    );
+  }
+
+  // Keep old code below for reference (not used anymore)
+  int _currentNavIndex = 0;
+
+  Widget _buildOldHome() {
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
       appBar: _buildAppBar(),
