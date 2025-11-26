@@ -16,6 +16,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 use App\Mail\VerifyEmailMail;
 use App\Mail\NewLoginMail;
+use App\Models\VolunteerRequest;
 
 class AuthController extends Controller
 {
@@ -227,6 +228,54 @@ class AuthController extends Controller
             'message' => 'Email verified successfully',
         ], 200);
     }
+
+
+public function me(Request $request)
+{
+    /** @var \App\Models\User $user */
+    $user = $request->user();
+
+    // علاقات للمستخدم العادي
+    $user->load([
+        'role:id,name',
+        'categories:id,name',
+        // ❌ شلنا organizerProfile من هون
+    ]);
+
+    // عدد الإشعارات غير المقروءة
+    $unreadNotificationsCount = $user->notifications()
+        ->where('read_status', false)
+        ->count();
+
+    // بيانات المنظم فقط إذا كان منظم
+    $organizerData = null;
+
+    if ($user->role && $user->role->name === 'organizer') {
+
+        // حمل organizerProfile فقط إذا كان منظم
+        $user->load('organizerProfile');
+
+        // عدد الأحداث
+        $eventsCount = $user->events()->count();
+
+        // عدد طلبات التطوع
+        $volunteerRequestsCount = VolunteerRequest::whereHas('event', function ($q) use ($user) {
+            $q->where('organizer_id', $user->id);
+        })->count();
+
+        $organizerData = [
+            'profile'                   => $user->organizerProfile,
+            'events_count'              => $eventsCount,
+            'volunteer_requests_count'  => $volunteerRequestsCount,
+        ];
+    }
+
+    return response()->json([
+        'user'                       => $user,
+        'unread_notifications_count' => $unreadNotificationsCount,
+        'organizer_data'             => $organizerData,
+    ]);
+}
 
     /**
      * Logout (for Sanctum)

@@ -12,17 +12,18 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
-    'role_id',
-    'name',
-    'email',
-    'phone',
-    'location',
-    'picture',
-    'birth_date',
-    'password',
-    'email_verification_token',
-    'last_login_ip', // 👈 ضفنا هذا
-];
+        'role_id',
+        'name',
+        'email',
+        'phone',
+        'location',
+        'picture',
+        'birth_date',
+        'password',
+        'email_verification_token',
+        'last_login_ip',
+        'notifications_enabled',   // 👈 new field for the profile toggle
+    ];
 
     protected $hidden = [
         'password',
@@ -32,37 +33,62 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'password'          => 'hashed', // Laravel 11 auto-hash
+            'email_verified_at'     => 'datetime',
+            'password'              => 'hashed',   // Laravel 11 auto-hash
+            'notifications_enabled' => 'boolean',  // 👈 cast toggle to bool
         ];
     }
 
-    // لو عندك علاقة categories:
+    // ========== Relationships ==========
+
+    // Preferred categories of the user
     public function categories()
     {
         return $this->belongsToMany(Category::class, 'category_user');
     }
 
+    // Requests to become organizer
     public function organizerRequests()
     {
         return $this->hasMany(OrganizerRequest::class);
     }
 
+    // Role: user / organizer / admin
     public function role()
     {
         return $this->belongsTo(Role::class);
     }
 
+    // Custom notifications table (your Notification model)
     public function notifications()
     {
-        return $this->hasMany(\App\Models\Notification::class);
+        return $this->hasMany(Notification::class);
     }
 
+    // Volunteer requests this user submitted
     public function volunteerRequests()
     {
-        return $this->hasMany(\App\Models\VolunteerRequest::class);
+        return $this->hasMany(VolunteerRequest::class);
     }
 
+    // Extra info if user is organizer
+    public function organizerProfile()
+    {
+        return $this->hasOne(OrganizerProfile::class, 'user_id');
+    }
 
+    // ========= New for profile features =========
 
+    // Events the user has saved (favorites)
+    public function savedEvents()
+    {
+        return $this->belongsToMany(Event::class, 'saved_events')
+                    ->withTimestamps();
+    }
+
+    // Tickets owned by the user (used for stats & "My Tickets")
+    public function tickets()
+    {
+        return $this->hasMany(Ticket::class);
+    }
 }
