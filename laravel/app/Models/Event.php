@@ -13,31 +13,57 @@ class Event extends Model
         'organizer_id',
         'name',
         'description',
+        'location',
+        'city',
+        'venue',
+        'price',
+        'capacity',
         'start_time',
         'end_time',
-        'is_live',    
-        'city',   
-        'location',    
-        'venue',       
-        'capacity',
-        'price',
         'online_link',
         'picture',
+        'status',
+        'published_at',
+        'is_live',
     ];
 
     protected $casts = [
-        'start_time' => 'datetime',
-        'end_time'   => 'datetime',
-        'is_live'    => 'boolean',
+        'start_time'   => 'datetime',
+        'end_time'     => 'datetime',
+        'published_at' => 'datetime',
+        'is_live'      => 'boolean',
+        'price'        => 'decimal:2',
     ];
 
+    // organizer (user)
     public function organizer()
     {
         return $this->belongsTo(User::class, 'organizer_id');
     }
 
+    // categories (pivot: category_event)
     public function categories()
     {
-        return $this->belongsToMany(Category::class, 'event_category');
+        return $this->belongsToMany(Category::class, 'category_event');
+    }
+
+    public function tickets()
+    {
+        return $this->hasMany(Ticket::class);
+    }
+
+    public function comments()
+    {
+        return $this->hasMany(Comment::class);
+    }
+
+    public function ratings()
+    {
+        return $this->hasMany(Rating::class);
+    }
+
+    public function volunteerRequests()
+    {
+        return $this->hasMany(VolunteerRequest::class);
     }
 }

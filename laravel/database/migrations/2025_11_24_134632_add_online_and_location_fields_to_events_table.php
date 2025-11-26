@@ -9,7 +9,6 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('events', function (Blueprint $table) {
-       
 
             // new sub-location fields
             $table->string('venue')->nullable()->after('city'); // e.g. Four Seasons Hotel
@@ -24,7 +23,6 @@ return new class extends Migration
     {
         Schema::table('events', function (Blueprint $table) {
             $table->dropColumn(['venue', 'is_live']); 
-           
         });
     }
 };
