@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\PublicEventController;
 use App\Http\Controllers\Api\ManageEventController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\User\OrganizerRequestController;
 use App\Http\Controllers\Admin\OrganizerRequestAdminController;
 use App\Http\Controllers\User\VolunteerRequestController;
@@ -17,7 +18,7 @@ use App\Http\Controllers\User\VolunteerRequestController;
 Route::prefix('auth')->group(function () {
 
     Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/signup',   [AuthController::class, 'register']); 
+    Route::post('/signup',   [AuthController::class, 'register']);
     Route::post('/login',    [AuthController::class, 'login']);
 
     Route::get('/verify-email', [AuthController::class, 'verifyEmail']);
@@ -35,9 +36,9 @@ Route::prefix('auth')->group(function () {
 // =====================
 
 // كروت الأحداث + search + filters
-Route::get('/events',          [PublicEventController::class, 'index']);
+Route::get('/events',         [PublicEventController::class, 'index']);
 // تفاصيل حدث واحد
-Route::get('/events/{event}',  [PublicEventController::class, 'show']);
+Route::get('/events/{event}', [PublicEventController::class, 'show']);
 
 Route::get('/categories', [CategoryController::class, 'index']);
 
@@ -49,9 +50,34 @@ Route::middleware('auth:sanctum')->group(function () {
     // ---------- Auth ----------
     Route::get('/auth/me', [AuthController::class, 'me']);
 
+    // ---------- PROFILE / ACCOUNT DASHBOARD ----------
+    // Main profile header + stats + account type info
+    Route::get('/profile', [ProfileController::class, 'show']);
+
+    // Edit profile (name / phone / location / picture)
+    Route::put('/profile', [ProfileController::class, 'update']);
+
+    // Change password inside profile (current + new)
+    Route::post('/profile/change-password', [ProfileController::class, 'changePassword']);
+
+    // Delete account
+    Route::delete('/profile', [ProfileController::class, 'deleteAccount']);
+
+    // Notification toggle on profile screen
+    Route::post('/profile/notifications', [ProfileController::class, 'updateNotifications']);
+
+    // Tickets & saved events lists
+    Route::get('/profile/tickets',       [ProfileController::class, 'tickets']);
+    Route::get('/profile/saved-events',  [ProfileController::class, 'savedEvents']);
+
+    // Save / unsave event (for "Saved events" + heart icon)
+    Route::post('/events/{event}/save',   [ProfileController::class, 'saveEvent']);
+    Route::delete('/events/{event}/save', [ProfileController::class, 'unsaveEvent']);
+
     // ---------- Organizer Request – user ----------
     Route::post('/organizer-requests',   [OrganizerRequestController::class, 'store']);
     Route::get('/organizer-requests/me', [OrganizerRequestController::class, 'myRequests']);
+
 
     // ---------- Organizer Request – admin ----------
     Route::prefix('admin')->group(function () {

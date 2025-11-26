@@ -46,6 +46,13 @@ class Event extends Model
     {
         return $this->belongsToMany(Category::class, 'category_event');
     }
+    
+    public function savedByUsers()
+{
+    return $this->belongsToMany(User::class, 'saved_events')
+                ->withTimestamps();
+}
+
 
     public function tickets()
     {
