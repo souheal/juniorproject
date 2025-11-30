@@ -3,10 +3,13 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 
 import 'home_screen.dart';
 import '../services/api_client.dart';
 import '../models/category_api_model.dart';
+import '../config.dart';
+import '../providers/profile_provider.dart';
 
 enum AuthMode { signIn, signUp }
 
@@ -263,15 +266,52 @@ class _AuthScreenState extends State<AuthScreen> {
 
         // Handle response
         if (response.statusCode == 201) {
-          // Success
+          // Success - User registered
           final responseData = json.decode(response.body);
           final message = responseData['message'] ?? 'User registered successfully';
+
+          // DEBUG: Print the full response to see what backend returns
+          debugPrint('=== SIGNUP RESPONSE ===');
+          debugPrint(response.body);
+          debugPrint('=======================');
+
+          // Extract token if provided (check all possible field names)
+          String? token = responseData['token'] ??
+                          responseData['access_token'] ??
+                          responseData['authorization']?['token'] ??
+                          responseData['data']?['token'] ??
+                          responseData['data']?['access_token'] ??
+                          responseData['user']?['token'];
+
+          // Get profile provider
+          final profileProvider = context.read<ProfileProvider>();
+
+          // Try to set profile from response data first
+          if (responseData['user'] != null || responseData['data']?['user'] != null) {
+            // Backend returned user data - use it
+            profileProvider.setProfileFromRegistration(
+              responseData,
+              token: token,
+            );
+          } else {
+            // Backend didn't return user data - use form data
+            // This allows immediate access even without token/user from backend
+            profileProvider.setProfileFromBasicInfo(
+              name: _nameController.text.trim(),
+              email: _emailController.text.trim(),
+              phone: _phoneController.text.trim(),
+              location: _selectedCity,
+              token: token,
+            );
+          }
 
           // Clear all form fields after successful signup
           setState(() {
             _isSubmitting = false;
             _clearAllFields();
           });
+
+          if (!mounted) return;
 
           // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
@@ -281,7 +321,7 @@ class _AuthScreenState extends State<AuthScreen> {
             ),
           );
 
-          // Navigate to home or next screen
+          // Navigate directly to home - skip any verification screens
           final completed = widget.onCompleted;
           if (completed != null) {
             completed(context);
@@ -347,7 +387,33 @@ class _AuthScreenState extends State<AuthScreen> {
           final data = json.decode(response.body);
           final message = data['message'] ?? 'Login successful';
 
+          // DEBUG: Print the full response to see what backend returns
+          debugPrint('=== LOGIN RESPONSE ===');
+          debugPrint(response.body);
+          debugPrint('======================');
+
+          // Extract and save the token (check all possible field names)
+          String? token = data['token'] ??
+                          data['access_token'] ??
+                          data['authorization']?['token'] ??
+                          data['data']?['token'] ??
+                          data['data']?['access_token'] ??
+                          data['user']?['token'];
+
+          if (token != null && token.isNotEmpty) {
+            // Save token to AuthHelper
+            AuthHelper.setToken(token);
+
+            // Fetch user profile
+            if (mounted) {
+              final profileProvider = context.read<ProfileProvider>();
+              await profileProvider.fetchProfile();
+            }
+          }
+
           setState(() => _isSubmitting = false);
+
+          if (!mounted) return;
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -375,17 +441,52 @@ class _AuthScreenState extends State<AuthScreen> {
             ),
           );
         } else if (response.statusCode == 403) {
-          // Email not verified
-          final data = json.decode(response.body);
-          final message = data['message'] ?? 'Email is not verified';
-
+          // Email not verified on server
           setState(() => _isSubmitting = false);
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(message),
-              backgroundColor: Colors.orange,
-              duration: const Duration(seconds: 5),
+          if (!mounted) return;
+
+          // Show friendly dialog instead of just a snackbar
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                children: [
+                  Icon(
+                    Icons.mail_outline,
+                    color: Colors.orange[700],
+                  ),
+                  const SizedBox(width: 8),
+                  const Text('Email Not Verified'),
+                ],
+              ),
+              content: const Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Your account is not verified on the server yet.',
+                    style: TextStyle(fontSize: 15),
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    'Please check your email inbox (and spam folder) for a verification link.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('OK'),
+                ),
+              ],
             ),
           );
         } else {

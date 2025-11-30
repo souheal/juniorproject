@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../../theme/app_theme.dart';
+import '../../providers/profile_provider.dart';
+import '../../utils/page_transitions.dart';
+import 'change_password_screen.dart';
+import '../legal/privacy_policy_screen.dart';
+import '../legal/terms_of_service_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -9,8 +16,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _darkMode = false;
-  bool _notifications = true;
   bool _emailNotifications = true;
   String _selectedLanguage = 'English';
 
@@ -27,133 +32,179 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: AppTheme.textPrimary),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: const Text('Settings'),
         backgroundColor: Colors.white,
         elevation: 0,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Appearance Section
-            const Text(
-              'Appearance',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textSecondary,
-              ),
+      body: Consumer<ProfileProvider>(
+        builder: (context, provider, child) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSectionTitle('Appearance'),
+                const SizedBox(height: 12),
+                _buildLanguageTile(),
+                const SizedBox(height: 24),
+
+                _buildSectionTitle('Notifications'),
+                const SizedBox(height: 12),
+                _buildNotificationTile(provider),
+                const SizedBox(height: 8),
+                _buildSwitchTile(
+                  icon: Icons.email_outlined,
+                  title: 'Email Notifications',
+                  subtitle: 'Receive email updates',
+                  value: _emailNotifications,
+                  onChanged: (value) {
+                    HapticFeedback.lightImpact();
+                    setState(() => _emailNotifications = value);
+                  },
+                ),
+                const SizedBox(height: 24),
+
+                _buildSectionTitle('Privacy & Security'),
+                const SizedBox(height: 12),
+                _buildMenuTile(
+                  icon: Icons.lock_outline,
+                  title: 'Change Password',
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.push(context, SlidePageRoute(page: const ChangePasswordScreen()));
+                  },
+                ),
+                const SizedBox(height: 8),
+                _buildMenuTile(
+                  icon: Icons.privacy_tip_outlined,
+                  title: 'Privacy Policy',
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.push(context, SlidePageRoute(page: const PrivacyPolicyScreen()));
+                  },
+                ),
+                const SizedBox(height: 8),
+                _buildMenuTile(
+                  icon: Icons.description_outlined,
+                  title: 'Terms of Service',
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.push(context, SlidePageRoute(page: const TermsOfServiceScreen()));
+                  },
+                ),
+                const SizedBox(height: 24),
+
+                _buildSectionTitle('Data'),
+                const SizedBox(height: 12),
+                _buildMenuTile(
+                  icon: Icons.download_outlined,
+                  title: 'Download My Data',
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Preparing your data download...')),
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+                _buildMenuTile(
+                  icon: Icons.delete_sweep_outlined,
+                  title: 'Clear Cache',
+                  subtitle: '25.4 MB',
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    _showClearCacheDialog();
+                  },
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            _buildSwitchTile(
-              icon: Icons.dark_mode_outlined,
-              title: 'Dark Mode',
-              subtitle: 'Enable dark theme',
-              value: _darkMode,
-              onChanged: (value) {
-                setState(() {
-                  _darkMode = value;
-                });
-              },
-            ),
-            const SizedBox(height: 8),
-            _buildLanguageTile(),
-            const SizedBox(height: 24),
-            // Notifications Section
-            const Text(
-              'Notifications',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildSwitchTile(
-              icon: Icons.notifications_outlined,
-              title: 'Push Notifications',
-              subtitle: 'Receive push notifications',
-              value: _notifications,
-              onChanged: (value) {
-                setState(() {
-                  _notifications = value;
-                });
-              },
-            ),
-            const SizedBox(height: 8),
-            _buildSwitchTile(
-              icon: Icons.email_outlined,
-              title: 'Email Notifications',
-              subtitle: 'Receive email updates',
-              value: _emailNotifications,
-              onChanged: (value) {
-                setState(() {
-                  _emailNotifications = value;
-                });
-              },
-            ),
-            const SizedBox(height: 24),
-            // Privacy Section
-            const Text(
-              'Privacy & Security',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildMenuTile(
-              icon: Icons.lock_outline,
-              title: 'Change Password',
-              onTap: () {
-                _showChangePasswordDialog();
-              },
-            ),
-            const SizedBox(height: 8),
-            _buildMenuTile(
-              icon: Icons.privacy_tip_outlined,
-              title: 'Privacy Policy',
-              onTap: () {},
-            ),
-            const SizedBox(height: 8),
-            _buildMenuTile(
-              icon: Icons.description_outlined,
-              title: 'Terms of Service',
-              onTap: () {},
-            ),
-            const SizedBox(height: 24),
-            // Data Section
-            const Text(
-              'Data',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildMenuTile(
-              icon: Icons.download_outlined,
-              title: 'Download My Data',
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Preparing your data download...')),
-                );
-              },
-            ),
-            const SizedBox(height: 8),
-            _buildMenuTile(
-              icon: Icons.delete_sweep_outlined,
-              title: 'Clear Cache',
-              subtitle: '25.4 MB',
-              onTap: () {
-                _showClearCacheDialog();
-              },
-            ),
-          ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 16,
+          decoration: BoxDecoration(
+            color: AppTheme.primaryColor,
+            borderRadius: BorderRadius.circular(2),
+          ),
         ),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textSecondary,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNotificationTile(ProfileProvider provider) {
+    final isEnabled = provider.profile?.notificationsEnabled ?? true;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppTheme.primaryColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Icon(Icons.notifications_outlined, color: AppTheme.primaryColor, size: 22),
+        ),
+        title: const Text(
+          'Push Notifications',
+          style: TextStyle(fontWeight: FontWeight.w500, color: AppTheme.textPrimary),
+        ),
+        subtitle: const Text(
+          'Receive push notifications',
+          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+        ),
+        trailing: provider.isSaving
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryColor),
+              )
+            : Switch(
+                value: isEnabled,
+                onChanged: (value) async {
+                  HapticFeedback.lightImpact();
+                  final result = await provider.updateNotifications(value);
+                  if (mounted && !result.success) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(result.message), backgroundColor: AppTheme.errorColor),
+                    );
+                  }
+                },
+                activeColor: AppTheme.primaryColor,
+              ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -169,38 +220,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: ListTile(
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: AppTheme.primaryColor.withOpacity(0.1),
+            color: AppTheme.primaryColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, color: AppTheme.primaryColor, size: 22),
         ),
-        title: Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.w500,
-            color: AppTheme.textPrimary,
-          ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppTheme.textSecondary,
-          ),
-        ),
-        trailing: Switch(
-          value: value,
-          onChanged: onChanged,
-          activeColor: AppTheme.primaryColor,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500, color: AppTheme.textPrimary)),
+        subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+        trailing: Switch(value: value, onChanged: onChanged, activeColor: AppTheme.primaryColor),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -215,37 +255,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: ListTile(
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: AppTheme.primaryColor.withOpacity(0.1),
+            color: AppTheme.primaryColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, color: AppTheme.primaryColor, size: 22),
         ),
-        title: Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.w500,
-            color: AppTheme.textPrimary,
-          ),
-        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500, color: AppTheme.textPrimary)),
         subtitle: subtitle != null
-            ? Text(
-                subtitle,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppTheme.textSecondary,
-                ),
-              )
+            ? Text(subtitle, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary))
             : null,
         trailing: const Icon(Icons.chevron_right, color: AppTheme.textSecondary),
         onTap: onTap,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -255,35 +288,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: ListTile(
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: AppTheme.primaryColor.withOpacity(0.1),
+            color: AppTheme.primaryColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: const Icon(Icons.language, color: AppTheme.primaryColor, size: 22),
         ),
-        title: const Text(
-          'Language',
-          style: TextStyle(
-            fontWeight: FontWeight.w500,
-            color: AppTheme.textPrimary,
-          ),
-        ),
-        subtitle: Text(
-          _selectedLanguage,
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppTheme.textSecondary,
-          ),
-        ),
+        title: const Text('Language', style: TextStyle(fontWeight: FontWeight.w500, color: AppTheme.textPrimary)),
+        subtitle: Text(_selectedLanguage, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
         trailing: const Icon(Icons.chevron_right, color: AppTheme.textSecondary),
-        onTap: _showLanguageSelector,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          _showLanguageSelector();
+        },
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -302,25 +331,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Select Language',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
+                const Text('Select Language', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 16),
                 ..._languages.map((language) {
                   final isSelected = language == _selectedLanguage;
                   return ListTile(
-                    title: Text(language),
-                    trailing: isSelected
-                        ? const Icon(Icons.check, color: AppTheme.primaryColor)
-                        : null,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppTheme.primaryColor.withValues(alpha: 0.1) : Colors.grey[100],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(child: Text(_getLanguageFlag(language), style: const TextStyle(fontSize: 20))),
+                    ),
+                    title: Text(
+                      language,
+                      style: TextStyle(
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        color: isSelected ? AppTheme.primaryColor : AppTheme.textPrimary,
+                      ),
+                    ),
+                    trailing: isSelected ? const Icon(Icons.check_circle, color: AppTheme.primaryColor) : null,
                     onTap: () {
-                      setState(() {
-                        _selectedLanguage = language;
-                      });
+                      HapticFeedback.lightImpact();
+                      setState(() => _selectedLanguage = language);
                       Navigator.pop(context);
                     },
                   );
@@ -333,60 +380,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showChangePasswordDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Change Password'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: 'Current Password',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: 'New Password',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: 'Confirm New Password',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Password changed successfully!'),
-                  backgroundColor: AppTheme.successColor,
-                ),
-              );
-            },
-            child: const Text('Change'),
-          ),
-        ],
-      ),
-    );
+  String _getLanguageFlag(String language) {
+    switch (language) {
+      case 'English': return '🇬🇧';
+      case 'Arabic': return '🇸🇦';
+      case 'French': return '🇫🇷';
+      case 'Spanish': return '🇪🇸';
+      case 'German': return '🇩🇪';
+      default: return '🌍';
+    }
   }
 
   void _showClearCacheDialog() {
@@ -394,23 +396,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Clear Cache'),
-        content: const Text('This will clear 25.4 MB of cached data. Continue?'),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.warningColor.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.delete_sweep_rounded, color: AppTheme.warningColor, size: 24),
+            ),
+            const SizedBox(width: 12),
+            const Text('Clear Cache'),
+          ],
+        ),
+        content: const Text(
+          'This will clear 25.4 MB of cached data including images and temporary files. Your account data will not be affected.',
+        ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
+              HapticFeedback.mediumImpact();
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Cache cleared successfully!'),
-                  backgroundColor: AppTheme.successColor,
-                ),
+                const SnackBar(content: Text('Cache cleared successfully!'), backgroundColor: AppTheme.successColor),
               );
             },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.warningColor),
             child: const Text('Clear'),
           ),
         ],

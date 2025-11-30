@@ -2,28 +2,33 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import 'illustrations/event_illustrations.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
- 
+import 'providers/profile_provider.dart';
+
 void main() {
   runApp(const EventsApp());
 }
 
 class EventsApp extends StatelessWidget {
   const EventsApp({super.key});
- 
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Events Onboarding',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6A62FF)),
-        textTheme: GoogleFonts.poppinsTextTheme(),
-        useMaterial3: true,
+    return ChangeNotifierProvider(
+      create: (_) => ProfileProvider(),
+      child: MaterialApp(
+        title: 'Events Onboarding',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6A62FF)),
+          textTheme: GoogleFonts.poppinsTextTheme(),
+          useMaterial3: true,
+        ),
+        home: const OnboardingScreen(),
       ),
-      home: const OnboardingScreen(),
     );
   }
 }

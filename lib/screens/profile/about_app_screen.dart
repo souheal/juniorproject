@@ -9,6 +9,10 @@ class AboutAppScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: AppTheme.textPrimary),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: const Text('About'),
         backgroundColor: Colors.white,
         elevation: 0,

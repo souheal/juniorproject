@@ -1,15 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config.dart';
 
 /// API client for communicating with Laravel backend.
 class ApiClient {
-  /// Base URL for the Laravel API.
-  ///
-  /// IMPORTANT: Adjust this based on where you're running Flutter:
-  /// - Android emulator: Use 'http://10.0.2.2:8000'
-  /// - iOS simulator: Use 'http://127.0.0.1:8000'
-  /// - Physical device: Use your computer's LAN IP (e.g., 'http://192.168.1.x:8000')
-  static const String baseUrl = 'http://192.168.1.5:8000';
+  /// Base URL for the Laravel API - now from centralized config
+  static String get baseUrl => AppConfig.baseUrl;
 
 
 
@@ -129,6 +125,215 @@ class ApiClient {
         },
       );
 
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // ============================================================
+  // PROFILE ENDPOINTS
+  // All profile endpoints require Authorization: Bearer <token>
+  // ============================================================
+
+  /// Get user profile data including stats and account type info.
+  ///
+  /// GET /api/profile
+  /// Requires authentication.
+  ///
+  /// Returns JSON with 'user', 'stats', and 'account_type' objects.
+  static Future<http.Response> getProfile() async {
+    final url = Uri.parse('$baseUrl/api/profile');
+
+    try {
+      final response = await http.get(
+        url,
+        headers: AuthHelper.headers,
+      );
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Update user profile (name, phone, location, picture).
+  ///
+  /// PUT /api/profile
+  /// Requires authentication.
+  ///
+  /// [data] should contain fields to update:
+  /// - name: string (optional)
+  /// - phone: string (optional)
+  /// - location: string (optional)
+  /// - picture: base64 encoded image string (optional)
+  ///
+  /// Returns JSON with 'message' and updated 'user' object.
+  static Future<http.Response> updateProfile(Map<String, dynamic> data) async {
+    final url = Uri.parse('$baseUrl/api/profile');
+
+    try {
+      final response = await http.put(
+        url,
+        headers: AuthHelper.headers,
+        body: json.encode(data),
+      );
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Change user password.
+  ///
+  /// POST /api/profile/change-password
+  /// Requires authentication.
+  ///
+  /// [currentPassword] - The user's current password
+  /// [newPassword] - The new password (min 8 characters)
+  /// [newPasswordConfirmation] - Must match newPassword
+  ///
+  /// Returns 200 on success, 422 if current password is incorrect.
+  static Future<http.Response> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String newPasswordConfirmation,
+  }) async {
+    final url = Uri.parse('$baseUrl/api/profile/change-password');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: AuthHelper.headers,
+        body: json.encode({
+          'current_password': currentPassword,
+          'new_password': newPassword,
+          'new_password_confirmation': newPasswordConfirmation,
+        }),
+      );
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Get user's tickets with event details.
+  ///
+  /// GET /api/profile/tickets
+  /// Requires authentication.
+  ///
+  /// Returns JSON with 'tickets' array containing ticket objects with nested event data.
+  static Future<http.Response> getProfileTickets() async {
+    final url = Uri.parse('$baseUrl/api/profile/tickets');
+
+    try {
+      final response = await http.get(
+        url,
+        headers: AuthHelper.headers,
+      );
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Get user's saved events.
+  ///
+  /// GET /api/profile/saved-events
+  /// Requires authentication.
+  ///
+  /// Returns JSON with 'events' array containing saved event objects.
+  static Future<http.Response> getSavedEvents() async {
+    final url = Uri.parse('$baseUrl/api/profile/saved-events');
+
+    try {
+      final response = await http.get(
+        url,
+        headers: AuthHelper.headers,
+      );
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Save an event to user's saved list.
+  ///
+  /// POST /api/events/{eventId}/save
+  /// Requires authentication.
+  ///
+  /// Returns 201 on success with 'message'.
+  static Future<http.Response> saveEvent(int eventId) async {
+    final url = Uri.parse('$baseUrl/api/events/$eventId/save');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: AuthHelper.headers,
+      );
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Remove an event from user's saved list.
+  ///
+  /// DELETE /api/events/{eventId}/save
+  /// Requires authentication.
+  ///
+  /// Returns 200 on success with 'message'.
+  static Future<http.Response> unsaveEvent(int eventId) async {
+    final url = Uri.parse('$baseUrl/api/events/$eventId/save');
+
+    try {
+      final response = await http.delete(
+        url,
+        headers: AuthHelper.headers,
+      );
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Update notification preferences.
+  ///
+  /// POST /api/profile/notifications
+  /// Requires authentication.
+  ///
+  /// [enabled] - true to enable notifications, false to disable
+  ///
+  /// Returns JSON with 'message' and 'notifications_enabled' boolean.
+  static Future<http.Response> updateNotifications(bool enabled) async {
+    final url = Uri.parse('$baseUrl/api/profile/notifications');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: AuthHelper.headers,
+        body: json.encode({'enabled': enabled}),
+      );
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Delete user account.
+  ///
+  /// DELETE /api/profile
+  /// Requires authentication.
+  ///
+  /// WARNING: This action is irreversible and will delete all user data.
+  /// Returns 200 on success with 'message'.
+  static Future<http.Response> deleteAccount() async {
+    final url = Uri.parse('$baseUrl/api/profile');
+
+    try {
+      final response = await http.delete(
+        url,
+        headers: AuthHelper.headers,
+      );
       return response;
     } catch (e) {
       rethrow;
