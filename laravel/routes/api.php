@@ -11,6 +11,9 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\User\OrganizerRequestController;
 use App\Http\Controllers\Admin\OrganizerRequestAdminController;
 use App\Http\Controllers\User\VolunteerRequestController;
+use App\Http\Controllers\Api\PaymentController;
+use App\Http\Controllers\Api\TicketController;
+
 
 // =====================
 // Auth routes (public)
@@ -110,3 +113,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/events/{event}/volunteer-requests', [VolunteerRequestController::class, 'store']);
     Route::get('/volunteer-requests/me',              [VolunteerRequestController::class, 'myRequests']);
 });
+
+//tickiting
+// Stripe webhook
+Route::post('/payments/stripe/webhook', [PaymentController::class, 'webhook']);
+Route::middleware('auth:sanctum')->group(function () {
+
+    // ...
+
+    // شراء تذكرة لحدث معيّن
+    Route::post('/events/{event}/checkout', [PaymentController::class, 'checkout']);
+
+    // تذاكر اليوزر
+    Route::get('/my-tickets', [TicketController::class, 'myTickets']);
+
+    Route::post('/organizer/tickets/scan', [TicketController::class, 'scan']);
+    // باقي الـ routes اللي عندك (organizer events, volunteer requests, ...).
+});
+

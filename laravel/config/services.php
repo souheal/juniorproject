@@ -34,5 +34,13 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+    'stripe' => [
+    'secret'         => env('STRIPE_SECRET_KEY'),
+    'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+    'success_url'    => env('STRIPE_SUCCESS_URL'),
+    'cancel_url'     => env('STRIPE_CANCEL_URL'),
+    'currency'       => env('STRIPE_CURRENCY', 'usd'),
+],
+
 
 ];
