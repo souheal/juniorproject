@@ -13,7 +13,7 @@ use App\Http\Controllers\Admin\OrganizerRequestAdminController;
 use App\Http\Controllers\User\VolunteerRequestController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\TicketController;
-
+use App\Http\Controllers\Api\OrganizerEventStatsController;
 
 // =====================
 // Auth routes (public)
@@ -46,6 +46,11 @@ Route::get('/events/{event}', [PublicEventController::class, 'show']);
 Route::get('/categories', [CategoryController::class, 'index']);
 
 // =====================
+// Stripe webhook (PUBLIC, بدون auth)
+// =====================
+Route::post('/payments/stripe/webhook', [PaymentController::class, 'webhook']);
+
+// =====================
 // Protected routes (need login)
 // =====================
 Route::middleware('auth:sanctum')->group(function () {
@@ -69,7 +74,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Notification toggle on profile screen
     Route::post('/profile/notifications', [ProfileController::class, 'updateNotifications']);
 
-    // Tickets & saved events lists
+    // Tickets & saved events lists (داخل صفحة البروفايل)
     Route::get('/profile/tickets',       [ProfileController::class, 'tickets']);
     Route::get('/profile/saved-events',  [ProfileController::class, 'savedEvents']);
 
@@ -80,7 +85,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // ---------- Organizer Request – user ----------
     Route::post('/organizer-requests',   [OrganizerRequestController::class, 'store']);
     Route::get('/organizer-requests/me', [OrganizerRequestController::class, 'myRequests']);
-
 
     // ---------- Organizer Request – admin ----------
     Route::prefix('admin')->group(function () {
@@ -99,35 +103,33 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ---------- Organizer: manage own events ----------
     Route::prefix('organizer')->group(function () {
+
+        // CRUD للأحداث تبع المنظم
         Route::get('/events',      [ManageEventController::class, 'index']);   // list own events
         Route::post('/events',     [ManageEventController::class, 'store']);   // create
         Route::put('/events/{id}', [ManageEventController::class, 'update']);  // update
+
+        // Dashboard + tickets لكل حدث (جديد)
+        Route::get('/events/{event}/dashboard', [OrganizerEventStatsController::class, 'dashboard']);
+        Route::get('/events/{event}/tickets',   [OrganizerEventStatsController::class, 'tickets']);
 
         // Volunteer requests على أحداثه
         Route::get('/volunteer-requests',               [VolunteerRequestController::class, 'organizerIndex']);
         Route::post('/volunteer-requests/{id}/approve', [VolunteerRequestController::class, 'approve']);
         Route::post('/volunteer-requests/{id}/reject',  [VolunteerRequestController::class, 'reject']);
+
+        // Scan للـ QR عند الباب (المنظم فقط)
+        Route::post('/tickets/scan', [TicketController::class, 'scan']);
     });
 
     // ---------- User: volunteer requests ----------
     Route::post('/events/{event}/volunteer-requests', [VolunteerRequestController::class, 'store']);
     Route::get('/volunteer-requests/me',              [VolunteerRequestController::class, 'myRequests']);
-});
 
-//tickiting
-// Stripe webhook
-Route::post('/payments/stripe/webhook', [PaymentController::class, 'webhook']);
-Route::middleware('auth:sanctum')->group(function () {
-
-    // ...
-
+    // ---------- Ticketing / Payments ----------
     // شراء تذكرة لحدث معيّن
     Route::post('/events/{event}/checkout', [PaymentController::class, 'checkout']);
 
-    // تذاكر اليوزر
+    // تذاكر اليوزر (للـ tab تبع My Tickets)
     Route::get('/my-tickets', [TicketController::class, 'myTickets']);
-
-    Route::post('/organizer/tickets/scan', [TicketController::class, 'scan']);
-    // باقي الـ routes اللي عندك (organizer events, volunteer requests, ...).
 });
-
