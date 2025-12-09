@@ -167,11 +167,11 @@ class AuthController extends Controller
         }
 
         // لازم يكون الإيميل مفعَّل
-        if ($user->email_verified_at === null) {
-            return response()->json([
-                'message' => 'Email is not verified',
-            ], 403);
-        }
+        // if ($user->email_verified_at === null) {
+        //     return response()->json([
+        //         'message' => 'Email is not verified',
+        //     ], 403);
+        // }
 
         // نحدد الـ IP الحالي
         $currentIp   = $request->ip();
@@ -189,7 +189,16 @@ class AuthController extends Controller
 
         // لو IP جديد → نبعت إيميل
         if ($isNewDevice) {
-            Mail::to($user->email)->send(new NewLoginMail($user, $currentIp));
+            try {
+                Mail::to($user->email)->send(new NewLoginMail($user, $currentIp));
+            } catch (\Throwable $e) {
+                Log::error('Failed to send new login email', [
+                    'user_id' => $user->id,
+                    'email'   => $user->email,
+                    'error'   => $e->getMessage(),
+                ]);
+                // Continue login even if email fails
+            }
         }
 
         return response()->json([

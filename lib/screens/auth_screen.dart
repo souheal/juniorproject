@@ -244,6 +244,12 @@ class _AuthScreenState extends State<AuthScreen> {
     try {
       // Only call API for Sign Up mode
       if (_mode == AuthMode.signUp) {
+        // Convert profile image to base64 if available
+        String? pictureBase64;
+        if (_profileImageBytes != null) {
+          pictureBase64 = base64Encode(_profileImageBytes!);
+        }
+
         // Build the JSON payload matching Laravel's expected format
         final requestData = {
           'name': _nameController.text.trim(),
@@ -253,7 +259,7 @@ class _AuthScreenState extends State<AuthScreen> {
           'birth_date': _birthDateController.text.trim(),
           'password': _passwordController.text,
           'password_confirmation': _confirmPasswordController.text,
-          'picture': null, // For now, send null (or base64 string if needed)
+          'picture': pictureBase64, // Send base64 encoded image
           'categories': _selectedCategories.map((c) => c.name).toList(),
         };
 
