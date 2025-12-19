@@ -168,6 +168,7 @@ class ManageEventController extends Controller
 
             'online_link' => ['nullable', 'url'],
             'picture'     => ['nullable', 'string'],
+            'volunteer_needs' => ['nullable', 'array'],
 
             'categories'   => ['required', 'array', 'min:1'],
             'categories.*' => ['integer', 'exists:categories,id'],
@@ -191,6 +192,7 @@ class ManageEventController extends Controller
             'price'        => $data['price'],
             'online_link'  => $data['online_link'] ?? null,
             'picture'      => $picturePath,
+            'volunteer_needs' => $data['volunteer_needs'] ?? null,
             'status'       => 'draft',
             'published_at' => null,
             'is_live'      => false,
@@ -242,6 +244,8 @@ class ManageEventController extends Controller
 
             'online_link' => ['sometimes', 'nullable', 'url'],
             'picture'     => ['sometimes', 'nullable', 'string'],
+            'volunteer_needs' => ['sometimes', 'nullable', 'array'],
+
 
             'categories'   => ['sometimes', 'array'],
             'categories.*' => ['integer', 'exists:categories,id'],

@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PublicEventController;
@@ -14,6 +15,9 @@ use App\Http\Controllers\User\VolunteerRequestController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\TicketController;
 use App\Http\Controllers\Api\OrganizerEventStatsController;
+
+// ✅ NEW: volunteer opportunities browse endpoints
+use App\Http\Controllers\Api\VolunteerOpportunitiesController;
 
 // =====================
 // Auth routes (public)
@@ -37,13 +41,17 @@ Route::prefix('auth')->group(function () {
 // =====================
 // Public: Events + Categories (Flutter user)
 // =====================
-
-// كروت الأحداث + search + filters
 Route::get('/events',         [PublicEventController::class, 'index']);
-// تفاصيل حدث واحد
 Route::get('/events/{event}', [PublicEventController::class, 'show']);
 
 Route::get('/categories', [CategoryController::class, 'index']);
+
+// =====================
+// ✅ Public: Volunteer Opportunities browse
+// =====================
+Route::get('/volunteer/opportunities', [VolunteerOpportunitiesController::class, 'index']);
+Route::get('/volunteer/opportunities/{event}', [VolunteerOpportunitiesController::class, 'showEvent']);
+Route::get('/volunteer/opportunities/{event}/roles/{type}', [VolunteerOpportunitiesController::class, 'roleDetails']);
 
 // =====================
 // Stripe webhook (PUBLIC, بدون auth)
@@ -59,26 +67,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
 
     // ---------- PROFILE / ACCOUNT DASHBOARD ----------
-    // Main profile header + stats + account type info
     Route::get('/profile', [ProfileController::class, 'show']);
-
-    // Edit profile (name / phone / location / picture)
     Route::put('/profile', [ProfileController::class, 'update']);
-
-    // Change password inside profile (current + new)
     Route::post('/profile/change-password', [ProfileController::class, 'changePassword']);
-
-    // Delete account
     Route::delete('/profile', [ProfileController::class, 'deleteAccount']);
-
-    // Notification toggle on profile screen
     Route::post('/profile/notifications', [ProfileController::class, 'updateNotifications']);
-
-    // Tickets & saved events lists (داخل صفحة البروفايل)
-    Route::get('/profile/tickets',       [ProfileController::class, 'tickets']);
-    Route::get('/profile/saved-events',  [ProfileController::class, 'savedEvents']);
-
-    // Save / unsave event (for "Saved events" + heart icon)
+    Route::get('/profile/tickets',      [ProfileController::class, 'tickets']);
+    Route::get('/profile/saved-events', [ProfileController::class, 'savedEvents']);
     Route::post('/events/{event}/save',   [ProfileController::class, 'saveEvent']);
     Route::delete('/events/{event}/save', [ProfileController::class, 'unsaveEvent']);
 
@@ -106,11 +101,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('organizer')->group(function () {
 
         // CRUD للأحداث تبع المنظم
-        Route::get('/events',      [ManageEventController::class, 'index']);   // list own events
-        Route::post('/events',     [ManageEventController::class, 'store']);   // create
-        Route::put('/events/{id}', [ManageEventController::class, 'update']);  // update
+        Route::get('/events',      [ManageEventController::class, 'index']);
+        Route::post('/events',     [ManageEventController::class, 'store']);
+        Route::put('/events/{id}', [ManageEventController::class, 'update']);
 
-        // Dashboard + tickets لكل حدث (جديد)
+        // Dashboard + tickets لكل حدث
         Route::get('/events/{event}/dashboard', [OrganizerEventStatsController::class, 'dashboard']);
         Route::get('/events/{event}/tickets',   [OrganizerEventStatsController::class, 'tickets']);
 
@@ -119,7 +114,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/volunteer-requests/{id}/approve', [VolunteerRequestController::class, 'approve']);
         Route::post('/volunteer-requests/{id}/reject',  [VolunteerRequestController::class, 'reject']);
 
-        // Scan للـ QR عند الباب (المنظم فقط)
+        // Scan للـ QR عند الباب
         Route::post('/tickets/scan', [TicketController::class, 'scan']);
     });
 
@@ -128,9 +123,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/volunteer-requests/me',              [VolunteerRequestController::class, 'myRequests']);
 
     // ---------- Ticketing / Payments ----------
-    // شراء تذكرة لحدث معيّن
     Route::post('/events/{event}/checkout', [PaymentController::class, 'checkout']);
-
-    // تذاكر اليوزر (للـ tab تبع My Tickets)
     Route::get('/my-tickets', [TicketController::class, 'myTickets']);
 });

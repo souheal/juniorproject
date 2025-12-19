@@ -10,22 +10,24 @@ class Event extends Model
     use HasFactory;
 
     protected $fillable = [
-        'organizer_id',
-        'name',
-        'description',
-        'location',
-        'city',
-        'venue',
-        'price',
-        'capacity',
-        'start_time',
-        'end_time',
-        'online_link',
-        'picture',
-        'status',
-        'published_at',
-        'is_live',
-    ];
+    'organizer_id',
+    'name',
+    'description',
+    'location',
+    'city',
+    'venue',
+    'price',
+    'capacity',
+    'start_time',
+    'end_time',
+    'online_link',
+    'picture',
+    'status',
+    'published_at',
+    'is_live',
+    'volunteer_needs', // ✅ ADD THIS
+];
+
 
     protected $casts = [
         'start_time'   => 'datetime',
@@ -33,6 +35,7 @@ class Event extends Model
         'published_at' => 'datetime',
         'is_live'      => 'boolean',
         'price'        => 'decimal:2',
+        'volunteer_needs' => 'array',
     ];
 
     // organizer (user)
