@@ -154,11 +154,20 @@ class AuthController extends Controller
             ], 401);
         }
 
+<<<<<<< HEAD
         if ($user->email_verified_at === null) {
             return response()->json([
                 'message' => 'Email is not verified',
             ], 403);
         }
+=======
+        // لازم يكون الإيميل مفعَّل
+        // if ($user->email_verified_at === null) {
+        //     return response()->json([
+        //         'message' => 'Email is not verified',
+        //     ], 403);
+        // }
+>>>>>>> cb03bf2af490fc099764dac3c1f7b1855affdf2b
 
         $currentIp   = $request->ip();
         $isNewDevice = $user->last_login_ip !== $currentIp;
@@ -176,12 +185,21 @@ class AuthController extends Controller
             try {
                 Mail::to($user->email)->send(new NewLoginMail($user, $currentIp));
             } catch (\Throwable $e) {
+<<<<<<< HEAD
                 Log::error('Failed to send NewLoginMail', [
                     'user_id' => $user->id,
                     'email'   => $user->email,
                     'ip'      => $currentIp,
                     'error'   => $e->getMessage(),
                 ]);
+=======
+                Log::error('Failed to send new login email', [
+                    'user_id' => $user->id,
+                    'email'   => $user->email,
+                    'error'   => $e->getMessage(),
+                ]);
+                // Continue login even if email fails
+>>>>>>> cb03bf2af490fc099764dac3c1f7b1855affdf2b
             }
         }
 

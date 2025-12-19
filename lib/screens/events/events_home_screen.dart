@@ -125,7 +125,24 @@ class _EventsHomeScreenState extends State<EventsHomeScreen> with TickerProvider
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final List<dynamic> eventsJson = data['data'] as List<dynamic>;
+
+        // Handle both array response and paginated response
+        List<dynamic> eventsJson;
+        int currentPage = 1;
+        int lastPage = 1;
+
+        if (data is List) {
+          // Backend returns array directly (no pagination)
+          eventsJson = data;
+        } else if (data is Map) {
+          // Backend returns paginated response
+          eventsJson = (data['data'] ?? data['events'] ?? []) as List<dynamic>;
+          currentPage = data['current_page'] as int? ?? 1;
+          lastPage = data['last_page'] as int? ?? 1;
+        } else {
+          eventsJson = [];
+        }
+
         final events = eventsJson
             .map((json) => EventApiModel.fromJson(json))
             .toList();
@@ -142,8 +159,8 @@ class _EventsHomeScreenState extends State<EventsHomeScreen> with TickerProvider
             }
 
             // Extract pagination info
-            _currentPage = data['current_page'] as int;
-            _totalPages = data['last_page'] as int;
+            _currentPage = currentPage;
+            _totalPages = lastPage;
           });
         }
       } else {

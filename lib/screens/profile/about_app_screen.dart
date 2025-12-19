@@ -1,8 +1,106 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
+import 'dart:io';
 import '../../theme/app_theme.dart';
 
 class AboutAppScreen extends StatelessWidget {
   const AboutAppScreen({super.key});
+
+  // Rate Us - Open app store
+  Future<void> _rateApp(BuildContext context) async {
+    // You'll need to replace these with your actual app IDs when published
+    final String androidPackageName = 'com.yourcompany.juniorproject';
+    final String iOSAppId = 'YOUR_IOS_APP_ID';
+
+    try {
+      if (Platform.isAndroid) {
+        final Uri playStoreUri = Uri.parse('market://details?id=$androidPackageName');
+        final Uri playStoreWebUri = Uri.parse('https://play.google.com/store/apps/details?id=$androidPackageName');
+
+        if (await canLaunchUrl(playStoreUri)) {
+          await launchUrl(playStoreUri, mode: LaunchMode.externalApplication);
+        } else {
+          await launchUrl(playStoreWebUri, mode: LaunchMode.externalApplication);
+        }
+      } else if (Platform.isIOS) {
+        final Uri appStoreUri = Uri.parse('https://apps.apple.com/app/id$iOSAppId');
+        await launchUrl(appStoreUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open app store')),
+        );
+      }
+    }
+  }
+
+  // Share App
+  Future<void> _shareApp(BuildContext context) async {
+    try {
+      const String appName = 'Event App';
+      const String appDescription = 'Discover and manage events with Event App!';
+      const String playStoreLink = 'https://play.google.com/store/apps/details?id=com.yourcompany.juniorproject';
+
+      await Share.share(
+        '$appName\n\n$appDescription\n\nDownload now:\n$playStoreLink',
+        subject: 'Check out $appName',
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not share app')),
+        );
+      }
+    }
+  }
+
+  // Contact Us via WhatsApp
+  Future<void> _contactUs(BuildContext context) async {
+    final Uri whatsappUri = Uri.parse('https://wa.me/963935535204?text=Hello, I need help with Event App');
+
+    try {
+      if (await canLaunchUrl(whatsappUri)) {
+        await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('WhatsApp is not installed')),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open WhatsApp')),
+        );
+      }
+    }
+  }
+
+  // Report Bug via WhatsApp
+  Future<void> _reportBug(BuildContext context) async {
+    final Uri whatsappUri = Uri.parse('https://wa.me/963935535204?text=Bug Report for Event App:%0A%0A');
+
+    try {
+      if (await canLaunchUrl(whatsappUri)) {
+        await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('WhatsApp is not installed')),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open WhatsApp')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -97,30 +195,22 @@ class AboutAppScreen extends StatelessWidget {
             _buildLinkTile(
               icon: Icons.star_rate,
               title: 'Rate Us',
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Opening app store...')),
-                );
-              },
+              onTap: () => _rateApp(context),
             ),
             _buildLinkTile(
               icon: Icons.share,
               title: 'Share App',
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Share dialog opening...')),
-                );
-              },
+              onTap: () => _shareApp(context),
             ),
             _buildLinkTile(
               icon: Icons.bug_report,
               title: 'Report a Bug',
-              onTap: () {},
+              onTap: () => _reportBug(context),
             ),
             _buildLinkTile(
               icon: Icons.email_outlined,
               title: 'Contact Us',
-              onTap: () {},
+              onTap: () => _contactUs(context),
             ),
             const SizedBox(height: 32),
             // Social Links

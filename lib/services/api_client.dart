@@ -114,7 +114,7 @@ class ApiClient {
     if (search != null && search.isNotEmpty) queryParams['search'] = search;
     queryParams['page'] = page.toString();
 
-    final url = Uri.parse('$baseUrl/api/events/browse').replace(queryParameters: queryParams);
+    final url = Uri.parse('$baseUrl/api/events').replace(queryParameters: queryParams);
 
     try {
       final response = await http.get(

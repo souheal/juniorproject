@@ -47,23 +47,53 @@ class EventApiModel {
   });
 
   factory EventApiModel.fromJson(Map<String, dynamic> json) {
+    // Parse organizer - handle both object and null
+    OrganizerModel organizer;
+    if (json['organizer'] != null && json['organizer'] is Map<String, dynamic>) {
+      organizer = OrganizerModel.fromJson(json['organizer'] as Map<String, dynamic>);
+    } else {
+      // Default organizer if not provided
+      organizer = OrganizerModel(id: 0, name: 'Unknown', email: '');
+    }
+
+    // Parse categories - handle both list and null
+    List<CategoryModel> categories = [];
+    if (json['categories'] != null && json['categories'] is List) {
+      categories = (json['categories'] as List<dynamic>)
+          .map((cat) => CategoryModel.fromJson(cat as Map<String, dynamic>))
+          .toList();
+    }
+
+    // Parse dates - handle null with default values
+    DateTime startTime;
+    DateTime endTime;
+    try {
+      startTime = json['start_time'] != null
+          ? DateTime.parse(json['start_time'] as String)
+          : DateTime.now();
+      endTime = json['end_time'] != null
+          ? DateTime.parse(json['end_time'] as String)
+          : DateTime.now().add(const Duration(hours: 2));
+    } catch (e) {
+      startTime = DateTime.now();
+      endTime = DateTime.now().add(const Duration(hours: 2));
+    }
+
     return EventApiModel(
       id: json['id'] as int,
-      name: json['name'] as String,
+      name: json['name'] as String? ?? 'Untitled Event',
       description: json['description'] as String?,
       picture: json['picture'] as String?,
-      startTime: DateTime.parse(json['start_time'] as String),
-      endTime: DateTime.parse(json['end_time'] as String),
+      startTime: startTime,
+      endTime: endTime,
       city: json['city'] as String? ?? '',
       location: json['location'] as String? ?? '',
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
       capacity: json['capacity'] as int?,
       onlineLink: json['online_link'] as String?,
       status: json['status'] as String?,
-      organizer: OrganizerModel.fromJson(json['organizer'] as Map<String, dynamic>),
-      categories: (json['categories'] as List<dynamic>)
-          .map((cat) => CategoryModel.fromJson(cat as Map<String, dynamic>))
-          .toList(),
+      organizer: organizer,
+      categories: categories,
       isLive: json['is_live'] as bool?,
       fullLocation: json['full_location'] as String?,
       // Optional future fields
@@ -134,7 +164,7 @@ class EventApiModel {
   String? get fullImageUrl {
     if (picture == null || picture!.isEmpty) return null;
     // Assuming Laravel storage URL structure
-    return 'http://192.168.1.5:8000/storage/$picture';
+    return 'http://192.168.1.11:8000/storage/$picture';
   }
 
   /// Get ticket price (priority: ticketPrice field > price field)

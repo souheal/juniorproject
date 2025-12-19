@@ -45,12 +45,14 @@ class PublicEventController extends Controller
 
         $cards = $events->map(function (Event $event) {
             return [
-                'id'      => $event->id,
-                'name'    => $event->name,
-                'city'    => $event->city,
-                'price'   => $event->price,
-                'picture' => $event->picture,
-                'is_live' => $this->computeIsLive($event),
+                'id'         => $event->id,
+                'name'       => $event->name,
+                'city'       => $event->city,
+                'price'      => $event->price,
+                'picture'    => $event->picture,
+                'start_time' => $event->start_time,
+                'end_time'   => $event->end_time,
+                'is_live'    => $this->computeIsLive($event),
             ];
         });
 

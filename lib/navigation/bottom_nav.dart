@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../screens/events/events_home_screen.dart';
-import '../screens/tickets/tickets_list_screen.dart';
+import '../screens/tickets/tickets_screen.dart';
 import '../screens/volunteer/volunteer_list_screen.dart';
 import '../screens/profile/profile_screen.dart';
 
@@ -25,7 +25,7 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
     super.initState();
     _screens = [
       const EventsHomeScreen(),
-      const TicketsListScreen(),
+      const TicketsScreen(),  // New screen with real API integration
       const VolunteerListScreen(),
       ProfileScreen(onLogout: widget.onLogout),
     ];
