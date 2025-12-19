@@ -26,6 +26,14 @@ class AuthController extends Controller
      */
     public function register(Request $request)
     {
+        // SECURITY: Prevent any attempt to create admin accounts
+        // Admin accounts can ONLY be created via AdminSeeder
+        if ($request->has('role') || $request->has('role_id')) {
+            return response()->json([
+                'message' => 'Invalid registration attempt. User roles cannot be specified during registration.',
+            ], 400);
+        }
+
         // 1) Validate request
         $validated = $request->validate([
             'name'                  => ['required', 'string', 'max:255'],
@@ -200,6 +208,9 @@ class AuthController extends Controller
                 // Continue login even if email fails
             }
         }
+
+        // Load user role for frontend authentication check
+        $user->load('role:id,name');
 
         return response()->json([
             'message' => 'Login successful',

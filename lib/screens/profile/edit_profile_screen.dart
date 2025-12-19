@@ -210,12 +210,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   _buildLocationDropdown(),
                   const SizedBox(height: 32),
 
-                  // Account Type Info
-                  if (provider.profile?.accountTypeInfo.canApplyForOrganizer ?? false)
-                    _buildOrganizerPromo(),
-
-                  const SizedBox(height: 24),
-
                   // Delete Account Button
                   _buildDeleteAccountButton(provider),
                 ],
@@ -441,68 +435,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         hint: const Text('Select your city'),
         isExpanded: true,
         icon: const Icon(Icons.keyboard_arrow_down_rounded),
-      ),
-    );
-  }
-
-  Widget _buildOrganizerPromo() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppTheme.primaryColor.withValues(alpha: 0.1),
-            AppTheme.primaryLight.withValues(alpha: 0.1),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppTheme.primaryColor.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.star_rounded,
-              color: AppTheme.primaryColor,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Become an Organizer',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Create and manage your own events',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Icon(
-            Icons.chevron_right_rounded,
-            color: AppTheme.primaryColor,
-          ),
-        ],
       ),
     );
   }

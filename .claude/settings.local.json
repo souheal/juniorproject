@@ -7,7 +7,19 @@
       "Bash(cd:*)",
       "Bash(pushd:*)",
       "Bash(popd)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tailwindcss init -p)",
+      "Bash(npx tailwindcss:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run build:*)",
+      "Bash(grep:*)",
+      "Bash(more:*)",
+      "Bash(findstr:*)",
+      "Bash(git checkout:*)",
+      "Bash(del \"C:\\\\Users\\\\Owner\\\\juniorproject\\\\lib\\\\screens\\\\profile\\\\become_organizer_screen.dart\")",
+      "Bash(del \"C:\\\\Users\\\\Owner\\\\juniorproject\\\\lib\\\\services\\\\organizer_request_service.dart\")"
     ],
     "deny": [],
     "ask": []
