@@ -26,7 +26,6 @@ class AuthController extends Controller
      */
     public function register(Request $request)
     {
-        // 1) Validate request
         $validated = $request->validate([
             'name'                  => ['required', 'string', 'max:255'],
             'email'                 => ['required', 'email', 'max:255', 'unique:users,email'],
@@ -34,14 +33,11 @@ class AuthController extends Controller
             'location'              => ['required', 'string', 'max:255'],
             'birth_date'            => ['required', 'date'],
             'password'              => ['required', 'string', 'min:6', 'confirmed'],
-            // picture is base64 string or null
             'picture'               => ['nullable', 'string'],
-            // categories as array of category names that already exist in `categories` table
             'categories'            => ['nullable', 'array'],
             'categories.*'          => ['string', Rule::exists('categories', 'name')],
         ]);
 
-        // 2) Fetch the "user" role (assuming it's seeded)
         $userRole = Role::where('name', 'user')->first();
 
         if (! $userRole) {
@@ -50,7 +46,7 @@ class AuthController extends Controller
             ], 500);
         }
 
-        // 3) Handle base64 picture (if present)
+        // Base64 picture
         $picturePath = null;
 
         if (isset($validated['picture']) && $validated['picture'] !== null && $validated['picture'] !== 'null') {
@@ -59,16 +55,13 @@ class AuthController extends Controller
             try {
                 $extension = 'png';
 
-                // If it's a data URL like "data:image/png;base64,AAA..."
                 if (str_starts_with($base64, 'data:image')) {
                     $parts = explode(',', $base64, 2);
                     if (count($parts) === 2) {
-                        $meta = $parts[0];      // e.g. "data:image/png;base64"
-                        $base64 = $parts[1];    // real base64 data
+                        $meta = $parts[0];
+                        $base64 = $parts[1];
 
-                        if (str_contains($meta, 'image/jpeg')) {
-                            $extension = 'jpg';
-                        } elseif (str_contains($meta, 'image/jpg')) {
+                        if (str_contains($meta, 'image/jpeg') || str_contains($meta, 'image/jpg')) {
                             $extension = 'jpg';
                         } elseif (str_contains($meta, 'image/webp')) {
                             $extension = 'webp';
@@ -89,7 +82,6 @@ class AuthController extends Controller
 
                 $picturePath = $path;
             } catch (\Throwable $e) {
-                // If decoding fails, just log it and continue without a picture
                 Log::error('Failed to decode/store profile picture', [
                     'email' => $validated['email'] ?? null,
                     'error' => $e->getMessage(),
@@ -98,7 +90,6 @@ class AuthController extends Controller
             }
         }
 
-        // 4) Create user + attach categories inside a transaction
         $user = null;
 
         DB::transaction(function () use (&$user, $validated, $userRole, $picturePath) {
@@ -124,15 +115,13 @@ class AuthController extends Controller
             }
         });
 
-        // 5) Generate email verification token & save it on the user
+        // Email verification token
         $token = Str::random(64);
         $user->email_verification_token = $token;
         $user->save();
 
-        // 6) Build verification URL
         $verificationUrl = url('/api/auth/verify-email?token=' . $token);
 
-        // 7) Try to send verification email (but DO NOT break if it fails)
         try {
             Mail::to($user->email)->send(new VerifyEmailMail($user, $token));
         } catch (\Throwable $e) {
@@ -141,12 +130,11 @@ class AuthController extends Controller
                 'email'   => $user->email,
                 'error'   => $e->getMessage(),
             ]);
-            // لا نرمي الاستثناء، التسجيل لازم يكمل عادي
         }
 
         return response()->json([
             'message'          => 'User registered successfully',
-            'verification_url' => $verificationUrl,  // 👈 هي اللي كنت ناقصتك
+            'verification_url' => $verificationUrl,
             'user'             => $user,
         ], 201);
     }
@@ -166,30 +154,35 @@ class AuthController extends Controller
             ], 401);
         }
 
-        // لازم يكون الإيميل مفعَّل
         if ($user->email_verified_at === null) {
             return response()->json([
                 'message' => 'Email is not verified',
             ], 403);
         }
 
-        // نحدد الـ IP الحالي
         $currentIp   = $request->ip();
         $isNewDevice = $user->last_login_ip !== $currentIp;
 
-        // نخزّن آخر IP
         $user->last_login_ip = $currentIp;
         $user->save();
 
-        // نمسح التوكنات القديمة (اختياري بس أنظف)
+        // حذف التوكنات القديمة (اختياري)
         $user->tokens()->delete();
 
-        // نولّد توكن جديد لـ Sanctum
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        // لو IP جديد → نبعت إيميل
+        // ✅ لا تخلي الإيميل يوقع تسجيل الدخول
         if ($isNewDevice) {
-            Mail::to($user->email)->send(new NewLoginMail($user, $currentIp));
+            try {
+                Mail::to($user->email)->send(new NewLoginMail($user, $currentIp));
+            } catch (\Throwable $e) {
+                Log::error('Failed to send NewLoginMail', [
+                    'user_id' => $user->id,
+                    'email'   => $user->email,
+                    'ip'      => $currentIp,
+                    'error'   => $e->getMessage(),
+                ]);
+            }
         }
 
         return response()->json([
@@ -213,15 +206,14 @@ class AuthController extends Controller
             ], 400);
         }
 
-        // لو هو أصلاً مفعّل
         if ($user->email_verified_at !== null) {
             return response()->json([
                 'message' => 'Email is already verified',
             ], 200);
         }
 
-        $user->email_verified_at      = now();
-        $user->email_verification_token = null;
+        $user->email_verified_at         = now();
+        $user->email_verification_token  = null;
         $user->save();
 
         return response()->json([
@@ -229,53 +221,46 @@ class AuthController extends Controller
         ], 200);
     }
 
+    public function me(Request $request)
+    {
+        /** @var \App\Models\User $user */
+        $user = $request->user();
 
-public function me(Request $request)
-{
-    /** @var \App\Models\User $user */
-    $user = $request->user();
+        $user->load([
+            'role:id,name',
+            'categories:id,name',
+        ]);
 
-    // علاقات للمستخدم العادي
-    $user->load([
-        'role:id,name',
-        'categories:id,name',
-        // ❌ شلنا organizerProfile من هون
-    ]);
+        $unreadNotificationsCount = $user->notifications()
+            ->where('read_status', false)
+            ->count();
 
-    // عدد الإشعارات غير المقروءة
-    $unreadNotificationsCount = $user->notifications()
-        ->where('read_status', false)
-        ->count();
+        $organizerData = null;
 
-    // بيانات المنظم فقط إذا كان منظم
-    $organizerData = null;
+        if ($user->role && $user->role->name === 'organizer') {
 
-    if ($user->role && $user->role->name === 'organizer') {
+            $user->load('organizerProfile');
 
-        // حمل organizerProfile فقط إذا كان منظم
-        $user->load('organizerProfile');
+            $eventsCount = $user->events()->count();
 
-        // عدد الأحداث
-        $eventsCount = $user->events()->count();
+            // ✅ إصلاح status: accepted (مو approved)
+            $volunteerRequestsCount = VolunteerRequest::whereHas('event', function ($q) use ($user) {
+                $q->where('organizer_id', $user->id);
+            })->where('status', 'accepted')->count();
 
-        // عدد طلبات التطوع
-        $volunteerRequestsCount = VolunteerRequest::whereHas('event', function ($q) use ($user) {
-            $q->where('organizer_id', $user->id);
-        })->count();
+            $organizerData = [
+                'profile'                   => $user->organizerProfile,
+                'events_count'              => $eventsCount,
+                'volunteer_requests_count'  => $volunteerRequestsCount,
+            ];
+        }
 
-        $organizerData = [
-            'profile'                   => $user->organizerProfile,
-            'events_count'              => $eventsCount,
-            'volunteer_requests_count'  => $volunteerRequestsCount,
-        ];
+        return response()->json([
+            'user'                       => $user,
+            'unread_notifications_count' => $unreadNotificationsCount,
+            'organizer_data'             => $organizerData,
+        ]);
     }
-
-    return response()->json([
-        'user'                       => $user,
-        'unread_notifications_count' => $unreadNotificationsCount,
-        'organizer_data'             => $organizerData,
-    ]);
-}
 
     /**
      * Logout (for Sanctum)

@@ -12,30 +12,20 @@ use Illuminate\Support\Facades\Storage;
 
 class ProfileController extends Controller
 {
-    /**
-     * GET /api/profile
-     * Returns header data, stats, and account-type info.
-     */
     public function show(Request $request)
     {
         $user = $request->user()->load('role');
 
-        // Stats
-// All tickets for this user
-$ticketsQuery = Ticket::where('user_id', $user->id);
+        $ticketsQuery = Ticket::where('user_id', $user->id);
 
-// Count ALL tickets (no status column in your DB)
-$ticketsCount = (clone $ticketsQuery)->count();
+        $ticketsCount = (clone $ticketsQuery)->count();
 
-// Count distinct events that the user has tickets for
-$eventsCount = (clone $ticketsQuery)
-    ->distinct('event_id')
-    ->count('event_id');
-
+        $eventsCount = (clone $ticketsQuery)
+            ->distinct('event_id')
+            ->count('event_id');
 
         $savedCount = $user->savedEvents()->count();
 
-        // Organizer / account type info
         $latestOrganizerRequest = OrganizerRequest::where('user_id', $user->id)
             ->latest()
             ->first();
@@ -62,7 +52,7 @@ $eventsCount = (clone $ticketsQuery)
                     : null,
                 'email_verified'        => ! is_null($user->email_verified_at),
                 'notifications_enabled' => (bool) $user->notifications_enabled,
-                'account_type'          => $accountType, // "user", "organizer", "admin"
+                'account_type'          => $accountType,
             ],
             'stats' => [
                 'events'  => $eventsCount,
@@ -71,16 +61,12 @@ $eventsCount = (clone $ticketsQuery)
             ],
             'account_type' => [
                 'current_type'            => $accountType,
-                'latest_request_status'   => $organizerStatus,   // pending/approved/rejected/null
+                'latest_request_status'   => $organizerStatus,
                 'can_apply_for_organizer' => $canApplyForOrganizer,
             ],
         ]);
     }
 
-    /**
-     * PUT /api/profile
-     * Edit profile (not password).
-     */
     public function update(Request $request)
     {
         $user = $request->user();
@@ -89,11 +75,23 @@ $eventsCount = (clone $ticketsQuery)
             'name'     => 'sometimes|string|max:255',
             'phone'    => 'sometimes|string|max:50',
             'location' => 'sometimes|string|max:255',
-            'picture'  => 'sometimes|nullable|string', // base64 image
+            'picture'  => 'sometimes|nullable|string',
         ]);
 
-        if (array_key_exists('picture', $data) && $data['picture']) {
-            $user->picture = $this->storeBase64Image($data['picture'], 'users');
+        // ✅ حذف القديمة قبل تخزين الجديدة
+        if (array_key_exists('picture', $data)) {
+            if ($data['picture']) {
+                if ($user->picture && Storage::disk('public')->exists($user->picture)) {
+                    Storage::disk('public')->delete($user->picture);
+                }
+                $user->picture = $this->storeBase64Image($data['picture'], 'users');
+            } else {
+                // إذا بعت null يعني حذف الصورة
+                if ($user->picture && Storage::disk('public')->exists($user->picture)) {
+                    Storage::disk('public')->delete($user->picture);
+                }
+                $user->picture = null;
+            }
         }
 
         unset($data['picture']);
@@ -107,10 +105,6 @@ $eventsCount = (clone $ticketsQuery)
         ]);
     }
 
-    /**
-     * POST /api/profile/change-password
-     * Change password inside profile.
-     */
     public function changePassword(Request $request)
     {
         $user = $request->user();
@@ -118,7 +112,6 @@ $eventsCount = (clone $ticketsQuery)
         $data = $request->validate([
             'current_password'      => 'required|string',
             'new_password'          => 'required|string|min:8|confirmed',
-            // needs new_password_confirmation
         ]);
 
         if (! Hash::check($data['current_password'], $user->password)) {
@@ -130,7 +123,6 @@ $eventsCount = (clone $ticketsQuery)
         $user->password = Hash::make($data['new_password']);
         $user->save();
 
-        // Optional: revoke other tokens
         if (method_exists($user, 'tokens')) {
             $currentTokenId = $request->user()->currentAccessToken()->id ?? null;
             $user->tokens()
@@ -143,9 +135,6 @@ $eventsCount = (clone $ticketsQuery)
         ]);
     }
 
-    /**
-     * GET /api/profile/tickets
-     */
     public function tickets(Request $request)
     {
         $user = $request->user();
@@ -160,15 +149,12 @@ $eventsCount = (clone $ticketsQuery)
         ]);
     }
 
-    /**
-     * GET /api/profile/saved-events
-     */
     public function savedEvents(Request $request)
     {
         $user = $request->user();
 
         $events = $user->savedEvents()
-            ->with('categories', 'organizer') // adjust if names differ
+            ->with('categories', 'organizer')
             ->orderByDesc('saved_events.created_at')
             ->get();
 
@@ -177,9 +163,6 @@ $eventsCount = (clone $ticketsQuery)
         ]);
     }
 
-    /**
-     * POST /api/events/{event}/save
-     */
     public function saveEvent(Request $request, Event $event)
     {
         $user = $request->user();
@@ -191,9 +174,6 @@ $eventsCount = (clone $ticketsQuery)
         ], 201);
     }
 
-    /**
-     * DELETE /api/events/{event}/save
-     */
     public function unsaveEvent(Request $request, Event $event)
     {
         $user = $request->user();
@@ -205,10 +185,6 @@ $eventsCount = (clone $ticketsQuery)
         ]);
     }
 
-    /**
-     * POST /api/profile/notifications
-     * Toggle notifications switch.
-     */
     public function updateNotifications(Request $request)
     {
         $user = $request->user();
@@ -226,16 +202,17 @@ $eventsCount = (clone $ticketsQuery)
         ]);
     }
 
-    /**
-     * DELETE /api/profile
-     * Delete account.
-     */
     public function deleteAccount(Request $request)
     {
         $user = $request->user();
 
         if (method_exists($user, 'tokens')) {
             $user->tokens()->delete();
+        }
+
+        // (اختياري) حذف صورة البروفايل من الستوريج
+        if ($user->picture && Storage::disk('public')->exists($user->picture)) {
+            Storage::disk('public')->delete($user->picture);
         }
 
         $user->delete();
@@ -245,9 +222,6 @@ $eventsCount = (clone $ticketsQuery)
         ]);
     }
 
-    /**
-     * Helper for base64 images.
-     */
     protected function storeBase64Image(string $base64, string $folder): string
     {
         if (preg_match('/^data:image\/(\w+);base64,/', $base64, $type)) {

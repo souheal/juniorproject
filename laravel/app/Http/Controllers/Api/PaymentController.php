@@ -9,6 +9,7 @@ use App\Models\Ticket;
 use App\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Stripe\Stripe;
 use Stripe\Checkout\Session as StripeSession;
@@ -24,25 +25,31 @@ class PaymentController extends Controller
     {
         $user = $request->user();
 
-        // 1) الحدث بدأ أو خلص؟
+        // الحدث بدأ أو خلص؟
         if ($event->start_time < now()) {
             return response()->json([
                 'message' => 'Event already started or finished.',
             ], 422);
         }
 
-        // 2) عدد التذاكر المدفوعة
+        // عدد التذاكر المدفوعة
         $paidTicketsCount = Ticket::where('event_id', $event->id)
             ->where('payment_status', 'paid')
             ->count();
 
-        if ($paidTicketsCount >= $event->capacity) {
+        // ✅ حجز مؤقت: pending آخر 15 دقيقة نحسبه ضمن السعة
+        $pendingHoldCount = Ticket::where('event_id', $event->id)
+            ->where('payment_status', 'pending')
+            ->where('created_at', '>=', now()->subMinutes(15))
+            ->count();
+
+        if (($paidTicketsCount + $pendingHoldCount) >= $event->capacity) {
             return response()->json([
                 'message' => 'Event is sold out.',
             ], 422);
         }
 
-        // 3) منع تكرار شراء تذكرة لنفس الحدث (اختياري)
+        // منع تكرار شراء تذكرة مدفوعة لنفس الحدث
         $alreadyHasTicket = Ticket::where('event_id', $event->id)
             ->where('user_id', $user->id)
             ->where('payment_status', 'paid')
@@ -54,55 +61,75 @@ class PaymentController extends Controller
             ], 422);
         }
 
-        // 4) إنشاء تذكرة بحالة pending و QR فريد (UUID)
+        // إنشاء Ticket pending
         $ticket = Ticket::create([
             'event_id'       => $event->id,
             'user_id'        => $user->id,
-            'qr_code'        => Str::uuid()->toString(), // فريد لكل تذكرة
+            'qr_code'        => Str::uuid()->toString(),
             'is_scanned'     => false,
             'scanned_at'     => null,
             'payment_status' => 'pending',
         ]);
 
-        // 5) إنشاء Payment بحالة pending
+        // إنشاء Payment pending
         $payment = Payment::create([
             'ticket_id' => $ticket->id,
-            'amount'    => $event->price,     // numeric(9,3)
+            'amount'    => $event->price,
             'method'    => 'stripe',
             'status'    => 'pending',
         ]);
 
-        // 6) Stripe Checkout Session
-        Stripe::setApiKey(config('services.stripe.secret'));
+        try {
+            Stripe::setApiKey(config('services.stripe.secret'));
 
-        $session = StripeSession::create([
-            'mode' => 'payment',
-            'payment_method_types' => ['card'],
-            'line_items' => [[
-                'quantity' => 1,
-                'price_data' => [
-                    'currency'    => config('services.stripe.currency', 'usd'),
-                    'unit_amount' => (int) round($event->price * 100), // إلى سنت
-                    'product_data' => [
-                        'name'        => $event->name,
-                        'description' => $event->city . ' - ' . $event->location,
+            $session = StripeSession::create([
+                'mode' => 'payment',
+                'payment_method_types' => ['card'],
+                'line_items' => [[
+                    'quantity' => 1,
+                    'price_data' => [
+                        'currency'    => config('services.stripe.currency', 'usd'),
+                        'unit_amount' => (int) round($event->price * 100),
+                        'product_data' => [
+                            'name'        => $event->name,
+                            'description' => $event->city . ' - ' . $event->location,
+                        ],
                     ],
+                ]],
+                'metadata' => [
+                    'ticket_id'  => $ticket->id,
+                    'payment_id' => $payment->id,
+                    'user_id'    => $user->id,
+                    'event_id'   => $event->id,
                 ],
-            ]],
-            'metadata' => [
-                'ticket_id'  => $ticket->id,
-                'payment_id' => $payment->id,
-                'user_id'    => $user->id,
-                'event_id'   => $event->id,
-            ],
-            'success_url' => config('services.stripe.success_url') . '?session_id={CHECKOUT_SESSION_ID}',
-            'cancel_url'  => config('services.stripe.cancel_url'),
-        ]);
+                'success_url' => config('services.stripe.success_url') . '?session_id={CHECKOUT_SESSION_ID}',
+                'cancel_url'  => config('services.stripe.cancel_url'),
+            ]);
 
-        return response()->json([
-            'checkout_url' => $session->url,
-            'session_id'   => $session->id,
-        ]);
+            return response()->json([
+                'checkout_url' => $session->url,
+                'session_id'   => $session->id,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Stripe checkout session create failed', [
+                'event_id' => $event->id,
+                'user_id'  => $user->id,
+                'ticket_id'=> $ticket->id,
+                'payment_id'=> $payment->id,
+                'error'    => $e->getMessage(),
+            ]);
+
+            // فشل إنشاء session -> خليه cancelled للتنظيف
+            $payment->status = 'cancelled';
+            $payment->save();
+
+            $ticket->payment_status = 'cancelled';
+            $ticket->save();
+
+            return response()->json([
+                'message' => 'Failed to start payment. Please try again.',
+            ], 500);
+        }
     }
 
     /**
@@ -132,31 +159,43 @@ class PaymentController extends Controller
             $ticketId  = $session->metadata->ticket_id ?? null;
             $paymentId = $session->metadata->payment_id ?? null;
 
-            if ($ticketId && $paymentId) {
-                $ticket = Ticket::with(['event', 'user'])->find($ticketId);
-                $payment = Payment::find($paymentId);
+            if (!$ticketId || !$paymentId) {
+                Log::warning('Stripe webhook missing ticket_id/payment_id in metadata');
+                return response()->json(['received' => true]);
+            }
 
-                if ($ticket) {
-                    $ticket->payment_status = 'paid';
-                    $ticket->save();
-                }
+            $ticket  = Ticket::with(['event', 'user'])->find($ticketId);
+            $payment = Payment::find($paymentId);
 
-                if ($payment) {
-                    $payment->status = 'completed';
-                    $payment->save();
-                }
+            if (!$ticket || !$payment) {
+                Log::error('Stripe webhook ticket/payment not found', [
+                    'ticket_id'  => $ticketId,
+                    'payment_id' => $paymentId,
+                ]);
+                return response()->json(['received' => true]);
+            }
 
-                // إرسال الإيميل بدون توليد صورة محلياً (الصورة من API خارجي)
-                if ($ticket && $ticket->user && $ticket->event) {
-                    try {
-                        Mail::to($ticket->user->email)
-                            ->send(new TicketPaidMail($ticket));
-                    } catch (\Throwable $e) {
-                        \Log::error('Failed to send TicketPaidMail', [
-                            'ticket_id' => $ticket->id,
-                            'error'     => $e->getMessage(),
-                        ]);
-                    }
+            // ✅ حماية من التكرار
+            if ($ticket->payment_status === 'paid' || $payment->status === 'completed') {
+                return response()->json(['received' => true]);
+            }
+
+            // ✅ علّمهم مدفوع/مكتمل
+            $ticket->payment_status = 'paid';
+            $ticket->save();
+
+            $payment->status = 'completed';
+            $payment->save();
+
+            // ✅ ايميل تأكيد (لا يكسر الويبهوك)
+            if ($ticket->user && $ticket->event) {
+                try {
+                    Mail::to($ticket->user->email)->send(new TicketPaidMail($ticket));
+                } catch (\Throwable $e) {
+                    Log::error('Failed to send TicketPaidMail', [
+                        'ticket_id' => $ticket->id,
+                        'error'     => $e->getMessage(),
+                    ]);
                 }
             }
         }

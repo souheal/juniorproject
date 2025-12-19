@@ -1,0 +1,22 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    public function up(): void
+    {
+        Schema::table('events', function (Blueprint $table) {
+            // Postgres: jsonb, MySQL: json works too
+            $table->jsonb('volunteer_needs')->nullable()->after('picture');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('events', function (Blueprint $table) {
+            $table->dropColumn('volunteer_needs');
+        });
+    }
+};

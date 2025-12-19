@@ -8,9 +8,6 @@ use Illuminate\Http\Request;
 
 class PublicEventController extends Controller
 {
-    /**
-     * هل الحدث شغال حالياً حسب الوقت؟
-     */
     protected function computeIsLive(Event $event): bool
     {
         if (!$event->start_time || !$event->end_time) {
@@ -23,27 +20,20 @@ class PublicEventController extends Controller
             && $now->lessThanOrEqualTo($event->end_time);
     }
 
-    // ======================
-    // Public browse endpoint (cards for user)
-    // ======================
     public function index(Request $request)
     {
         $query = Event::query()
-            // تقدر تخليها بس published لو حبيت:
-            // ->where('status', 'published')
+            ->where('status', 'published') // ✅ مهم
             ->whereDate('start_time', '>=', now()->startOfDay());
 
-        // 🔎 search بالاسم (جزئي)
         if ($search = $request->input('search')) {
             $query->where('name', 'ILIKE', '%' . $search . '%');
         }
 
-        // city (اختياري)
         if ($city = $request->input('city')) {
             $query->where('city', 'ILIKE', '%' . $city . '%');
         }
 
-        // price range (اختياري)
         if ($request->filled('min_price')) {
             $query->where('price', '>=', $request->input('min_price'));
         }
@@ -53,7 +43,6 @@ class PublicEventController extends Controller
 
         $events = $query->orderBy('start_time', 'asc')->get();
 
-        // نحولها لـ "كروت"
         $cards = $events->map(function (Event $event) {
             return [
                 'id'      => $event->id,
@@ -68,11 +57,13 @@ class PublicEventController extends Controller
         return response()->json($cards);
     }
 
-    // ======================
-    // Public event details
-    // ======================
     public function show(Event $event)
     {
+        // ✅ ما نطلع draft للناس
+        if ($event->status !== 'published') {
+            return response()->json(['message' => 'Event not found.'], 404);
+        }
+
         $event->load([
             'organizer:id,name',
             'categories:id,name',
