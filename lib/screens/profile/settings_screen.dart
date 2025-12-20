@@ -96,30 +96,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Navigator.push(context, SlidePageRoute(page: const TermsOfServiceScreen()));
                   },
                 ),
-                const SizedBox(height: 24),
-
-                _buildSectionTitle('Data'),
-                const SizedBox(height: 12),
-                _buildMenuTile(
-                  icon: Icons.download_outlined,
-                  title: 'Download My Data',
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Preparing your data download...')),
-                    );
-                  },
-                ),
-                const SizedBox(height: 8),
-                _buildMenuTile(
-                  icon: Icons.delete_sweep_outlined,
-                  title: 'Clear Cache',
-                  subtitle: '25.4 MB',
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    _showClearCacheDialog();
-                  },
-                ),
               ],
             ),
           );
@@ -389,45 +365,5 @@ class _SettingsScreenState extends State<SettingsScreen> {
       case 'German': return '🇩🇪';
       default: return '🌍';
     }
-  }
-
-  void _showClearCacheDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.warningColor.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.delete_sweep_rounded, color: AppTheme.warningColor, size: 24),
-            ),
-            const SizedBox(width: 12),
-            const Text('Clear Cache'),
-          ],
-        ),
-        content: const Text(
-          'This will clear 25.4 MB of cached data including images and temporary files. Your account data will not be affected.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              HapticFeedback.mediumImpact();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Cache cleared successfully!'), backgroundColor: AppTheme.successColor),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.warningColor),
-            child: const Text('Clear'),
-          ),
-        ],
-      ),
-    );
   }
 }

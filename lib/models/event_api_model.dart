@@ -164,7 +164,7 @@ class EventApiModel {
   String? get fullImageUrl {
     if (picture == null || picture!.isEmpty) return null;
     // Assuming Laravel storage URL structure
-    return 'http://192.168.1.11:8000/storage/$picture';
+    return 'http://192.168.1.12:8000/storage/$picture';
   }
 
   /// Get ticket price (priority: ticketPrice field > price field)

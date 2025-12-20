@@ -7,7 +7,7 @@ library;
 class AppConfig {
   /// Base URL for all API requests
   /// Change this to your production URL when deploying
-  static const String baseUrl = 'http://192.168.1.11:8000';
+  static const String baseUrl = 'http://192.168.1.12:8000';
 
   /// API version prefix
   static const String apiPrefix = '/api';

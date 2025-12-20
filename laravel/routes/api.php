@@ -77,7 +77,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/organizer-requests/me', [OrganizerRequestController::class, 'myRequests']);
 
     // ---------- Organizer Request – admin ----------
-    Route::prefix('admin')->group(function () {
+    // ADMIN ONLY: All routes in this group require admin role
+    Route::prefix('admin')->middleware('admin')->group(function () {
         Route::get('/organizer-requests',               [OrganizerRequestAdminController::class, 'index']);
         Route::post('/organizer-requests/{id}/approve', [OrganizerRequestAdminController::class, 'approve']);
         Route::post('/organizer-requests/{id}/reject',  [OrganizerRequestAdminController::class, 'reject']);
