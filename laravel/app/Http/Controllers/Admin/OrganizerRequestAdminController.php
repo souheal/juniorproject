@@ -6,42 +6,61 @@ use App\Http\Controllers\Controller;
 use App\Models\OrganizerRequest;
 use App\Models\OrganizerProfile;
 use App\Models\Role;
-use App\Models\User;
 use App\Models\Notification;
 use Illuminate\Http\Request;
 
 class OrganizerRequestAdminController extends Controller
 {
-    /**
-     * عرض كل طلبات المنظّمين
-     */
-    public function index()
-{
-    $requests = OrganizerRequest::with('user:id,name,email')
-        ->orderByRaw("
-            CASE status
-                WHEN 'pending' THEN 1
-                WHEN 'approved' THEN 2
-                WHEN 'rejected' THEN 3
-                ELSE 4
-            END
-        ")
-        ->orderByDesc('created_at')
-        ->get();
+    protected function requireAdmin(Request $request)
+    {
+        $user = $request->user();
 
-    return response()->json($requests);
-}
+        if (! $user || ! $user->role || $user->role->name !== 'admin') {
+            abort(response()->json([
+                'message' => 'Only admins can perform this action.',
+            ], 403));
+        }
 
+        return $user;
+    }
 
-    /**
-     * قبول الطلب:
-     * - تغيير status إلى approved
-     * - إعطاء اليوزر role = organizer
-     * - إنشاء OrganizerProfile (لو مش موجود)
-     * - إرسال إشعار لليوزر أنه أصبح منظّم
-     */
+    public function index(Request $request)
+    {
+        $this->requireAdmin($request);
+
+        $requests = OrganizerRequest::with('user:id,name,email')
+            ->orderByRaw("
+                CASE status
+                    WHEN 'pending' THEN 1
+                    WHEN 'approved' THEN 2
+                    WHEN 'rejected' THEN 3
+                    ELSE 4
+                END
+            ")
+            ->orderByDesc('created_at')
+            ->get();
+
+        // stats للصورة (156/23/112/21)
+        $total    = OrganizerRequest::count();
+        $pending  = OrganizerRequest::where('status', 'pending')->count();
+        $approved = OrganizerRequest::where('status', 'approved')->count();
+        $rejected = OrganizerRequest::where('status', 'rejected')->count();
+
+        return response()->json([
+            'stats' => [
+                'total'    => $total,
+                'pending'  => $pending,
+                'approved' => $approved,
+                'rejected' => $rejected,
+            ],
+            'requests' => $requests,
+        ]);
+    }
+
     public function approve(Request $request, $id)
     {
+        $this->requireAdmin($request);
+
         $orgRequest = OrganizerRequest::with('user')->findOrFail($id);
 
         if ($orgRequest->status === 'approved') {
@@ -50,12 +69,10 @@ class OrganizerRequestAdminController extends Controller
             ], 422);
         }
 
-        // 1) عدّل حالة الطلب
         $orgRequest->status = 'approved';
         $orgRequest->admin_comment = $request->input('admin_comment');
         $orgRequest->save();
 
-        // 2) حوّل اليوزر إلى organizer
         $user = $orgRequest->user;
 
         if ($user) {
@@ -66,16 +83,14 @@ class OrganizerRequestAdminController extends Controller
                 $user->save();
             }
 
-            // 3) أنشئ OrganizerProfile لو مش موجود
             OrganizerProfile::firstOrCreate(
                 ['user_id' => $user->id],
                 [
-                    'website'  => null,  // ممكن تعدّلها لاحقاً من الـ app
+                    'website'  => null,
                     'verified' => true,
                 ]
             );
 
-            // 4) إشعار لليوزر أنه تم قبوله كمنظّم
             Notification::create([
                 'user_id'     => $user->id,
                 'event_id'    => null,
@@ -91,13 +106,10 @@ class OrganizerRequestAdminController extends Controller
         ]);
     }
 
-    /**
-     * رفض الطلب:
-     * - status = rejected
-     * - إرسال إشعار لليوزر أنه تم الرفض
-     */
     public function reject(Request $request, $id)
     {
+        $this->requireAdmin($request);
+
         $data = $request->validate([
             'admin_comment' => ['nullable', 'string', 'max:1000'],
         ]);
