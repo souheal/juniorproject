@@ -24,15 +24,10 @@ use App\Http\Controllers\Api\VolunteerOpportunitiesController;
 // =====================
 Route::prefix('auth')->group(function () {
 
-    Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/signup',   [AuthController::class, 'register']);
-    Route::post('/login',    [AuthController::class, 'login']);
-
-    Route::get('/verify-email', [AuthController::class, 'verifyEmail']);
-
-    Route::post('/logout', [AuthController::class, 'logout'])
-        ->middleware('auth:sanctum');
-
+Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/verify-email-code', [AuthController::class, 'verifyEmailCode']);
+    Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
     // Password reset
     Route::post('/password/forgot', [PasswordResetController::class, 'requestReset']);
     Route::post('/password/reset',  [PasswordResetController::class, 'reset']);
