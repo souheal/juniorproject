@@ -144,7 +144,7 @@ Location: `app/Http/Middleware/EnsureUserIsAdmin.php`
 
 ### Test 1: Admin Login (Should Succeed)
 ```bash
-curl -X POST http://192.168.1.12:8000/api/auth/login \
+curl -X POST http://10.74.241.124:8000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "admin@eventy.com",
@@ -171,7 +171,7 @@ Expected Response:
 
 ### Test 2: Access Admin Route (Should Succeed with Admin Token)
 ```bash
-curl -X GET http://192.168.1.12:8000/api/admin/organizer-requests \
+curl -X GET http://10.74.241.124:8000/api/admin/organizer-requests \
   -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
   -H "Accept: application/json"
 ```
@@ -179,7 +179,7 @@ curl -X GET http://192.168.1.12:8000/api/admin/organizer-requests \
 ### Test 3: Access Admin Route as Non-Admin (Should Fail)
 ```bash
 # Login as regular user first, then try admin endpoint
-curl -X GET http://192.168.1.12:8000/api/admin/organizer-requests \
+curl -X GET http://10.74.241.124:8000/api/admin/organizer-requests \
   -H "Authorization: Bearer USER_TOKEN" \
   -H "Accept: application/json"
 ```
@@ -193,7 +193,7 @@ Expected Response:
 
 ### Test 4: Attempt to Register as Admin (Should Fail)
 ```bash
-curl -X POST http://192.168.1.12:8000/api/auth/register \
+curl -X POST http://10.74.241.124:8000/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "email": "fake-admin@test.com",

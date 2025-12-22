@@ -7,6 +7,8 @@ import '../../theme/app_theme.dart';
 import '../../utils/page_transitions.dart';
 import '../../providers/profile_provider.dart';
 import '../../widgets/error_retry_widget.dart';
+import '../../services/organizer_storage_service.dart';
+import '../../models/organizer_models.dart';
 import 'edit_profile_screen.dart';
 import 'settings_screen.dart';
 import 'about_app_screen.dart';
@@ -28,8 +30,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   late AnimationController _animationController;
   late Animation<double> _headerAnimation;
 
-  // Local state for organizer request (frontend only)
-  bool _isOrganizerRequestPending = false;
+  // Organizer approval status from localStorage
+  OrganizerApprovalStatus _organizerStatus = OrganizerApprovalStatus.none;
+  bool _isLoadingStatus = true;
 
   @override
   void initState() {
@@ -44,10 +47,22 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     );
     _animationController.forward();
 
-    // Fetch profile data on init
+    // Fetch profile data and organizer status on init
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadProfile();
+      _loadOrganizerStatus();
     });
+  }
+
+  Future<void> _loadOrganizerStatus() async {
+    await OrganizerStorageService.init();
+    final status = await OrganizerStorageService.getApprovalStatus();
+    if (mounted) {
+      setState(() {
+        _organizerStatus = status;
+        _isLoadingStatus = false;
+      });
+    }
   }
 
   Future<void> _loadProfile() async {
@@ -737,8 +752,102 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   Widget _buildBecomeOrganizerButton() {
+    // Still loading status
+    if (_isLoadingStatus) {
+      return const SizedBox.shrink();
+    }
+
+    // Hide completely if approved (user now has Organizer tab)
+    if (_organizerStatus == OrganizerApprovalStatus.approved) {
+      return const SizedBox.shrink();
+    }
+
+    // Show rejected state with option to reapply
+    if (_organizerStatus == OrganizerApprovalStatus.rejected) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppTheme.errorColor.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: AppTheme.errorColor.withValues(alpha: 0.3),
+            width: 1.5,
+          ),
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.errorColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.cancel_outlined,
+                    color: AppTheme.errorColor,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Organizer Request Rejected',
+                        style: TextStyle(
+                          color: AppTheme.errorColor,
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Your request was not approved',
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () async {
+                  // Reset status and allow reapplication
+                  await OrganizerStorageService.setApprovalStatus(
+                    OrganizerApprovalStatus.none,
+                  );
+                  await OrganizerStorageService.clearOrganizerRequest();
+                  _loadOrganizerStatus();
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.primaryColor,
+                  side: const BorderSide(color: AppTheme.primaryColor),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text('Apply Again'),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     // Show pending state if request was submitted
-    if (_isOrganizerRequestPending) {
+    if (_organizerStatus == OrganizerApprovalStatus.pending) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(20),
@@ -809,7 +918,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       );
     }
 
-    // Show button to apply as organizer
+    // Show button to apply as organizer (status == none)
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
@@ -900,9 +1009,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       backgroundColor: Colors.transparent,
       builder: (context) => _BecomeOrganizerForm(
         onSubmit: () {
-          setState(() {
-            _isOrganizerRequestPending = true;
-          });
+          // Reload status from storage
+          _loadOrganizerStatus();
         },
       ),
     );
@@ -1158,7 +1266,7 @@ class _BecomeOrganizerFormState extends State<_BecomeOrganizerForm> {
     }
   }
 
-  void _handleSubmit() {
+  Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
 
     HapticFeedback.mediumImpact();
@@ -1167,36 +1275,48 @@ class _BecomeOrganizerFormState extends State<_BecomeOrganizerForm> {
       _isSubmitting = true;
     });
 
-    // Simulate a short delay for UI feedback (no actual API call)
-    Future.delayed(const Duration(milliseconds: 800), () {
-      if (mounted) {
-        Navigator.pop(context);
-        widget.onSubmit();
+    // Create and save organizer request to local storage
+    final request = OrganizerRequest(
+      id: OrganizerStorageService.generateId('req'),
+      organizationName: _organizationNameController.text.trim(),
+      description: _descriptionController.text.trim(),
+      documentPaths: _selectedFileName != null ? [_selectedFileName!] : [],
+      createdAt: DateTime.now(),
+      status: OrganizerApprovalStatus.pending,
+    );
 
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white, size: 20),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'Your organizer request has been sent and is under review.',
-                    style: TextStyle(fontWeight: FontWeight.w500),
-                  ),
+    await OrganizerStorageService.submitOrganizerRequest(request);
+
+    // Simulate a short delay for UI feedback
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    if (mounted) {
+      Navigator.pop(context);
+      widget.onSubmit();
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.white, size: 20),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Your organizer request has been sent and is under review.',
+                  style: TextStyle(fontWeight: FontWeight.w500),
                 ),
-              ],
-            ),
-            backgroundColor: AppTheme.successColor,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            duration: const Duration(seconds: 4),
-            margin: const EdgeInsets.all(16),
+              ),
+            ],
           ),
-        );
-      }
-    });
+          backgroundColor: AppTheme.successColor,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(seconds: 4),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    }
   }
 
   @override
@@ -1508,7 +1628,106 @@ class _BecomeOrganizerFormState extends State<_BecomeOrganizerForm> {
                           ),
                         ),
                       ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
+
+                    // DEV ONLY: Admin approval simulation toggle
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.grey[300]!,
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.developer_mode,
+                                color: Colors.grey[600],
+                                size: 18,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'DEV ONLY: Simulate Admin Action',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () async {
+                                    await OrganizerStorageService.setApprovalStatus(
+                                      OrganizerApprovalStatus.approved,
+                                    );
+                                    await OrganizerStorageService.createProfileFromRequest();
+                                    await OrganizerStorageService.initializeSampleData();
+                                    if (mounted) {
+                                      Navigator.pop(context);
+                                      widget.onSubmit();
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: const Text('DEV: Approved! Restart app to see Organizer tab.'),
+                                          backgroundColor: AppTheme.successColor,
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppTheme.successColor,
+                                    side: const BorderSide(color: AppTheme.successColor),
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                  ),
+                                  child: const Text('Approve'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () async {
+                                    await OrganizerStorageService.setApprovalStatus(
+                                      OrganizerApprovalStatus.rejected,
+                                    );
+                                    if (mounted) {
+                                      Navigator.pop(context);
+                                      widget.onSubmit();
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: const Text('DEV: Request rejected.'),
+                                          backgroundColor: AppTheme.errorColor,
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppTheme.errorColor,
+                                    side: const BorderSide(color: AppTheme.errorColor),
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                  ),
+                                  child: const Text('Reject'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
 
                     // Submit Button
                     SizedBox(

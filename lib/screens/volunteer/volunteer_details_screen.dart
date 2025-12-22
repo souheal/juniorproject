@@ -1,15 +1,205 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../models/volunteer_model.dart';
+import '../../services/volunteer_api_service.dart';
 import '../../theme/app_theme.dart';
+import '../../config.dart';
 
-class VolunteerDetailsScreen extends StatelessWidget {
-  final VolunteerOpportunity opportunity;
+class VolunteerDetailsScreen extends StatefulWidget {
+  final int eventId;
+  final String roleType;
 
-  const VolunteerDetailsScreen({super.key, required this.opportunity});
+  const VolunteerDetailsScreen({
+    super.key,
+    required this.eventId,
+    required this.roleType,
+  });
+
+  @override
+  State<VolunteerDetailsScreen> createState() => _VolunteerDetailsScreenState();
+}
+
+class _VolunteerDetailsScreenState extends State<VolunteerDetailsScreen> {
+  RoleDetailsDto? _roleDetails;
+  bool _isLoading = true;
+  String? _error;
+  bool _isApplying = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRoleDetails();
+  }
+
+  Future<void> _loadRoleDetails() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final details = await VolunteerApiService.getRoleDetails(
+        widget.eventId,
+        widget.roleType,
+      );
+      if (mounted) {
+        setState(() {
+          _roleDetails = details;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _applyAsVolunteer() async {
+    // Check if user is logged in
+    if (AuthHelper.token == null) {
+      _showLoginRequiredDialog();
+      return;
+    }
+
+    setState(() => _isApplying = true);
+
+    final response = await VolunteerApiService.applyAsVolunteer(
+      eventId: widget.eventId,
+      volunteerType: widget.roleType,
+    );
+
+    setState(() => _isApplying = false);
+
+    if (mounted) {
+      HapticFeedback.mediumImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                response.success ? Icons.check_circle : Icons.error_outline,
+                color: Colors.white,
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: Text(response.message)),
+            ],
+          ),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: response.success ? AppTheme.successColor : AppTheme.errorColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+
+      if (response.success) {
+        // Reload to update spots left
+        _loadRoleDetails();
+      }
+    }
+  }
+
+  void _showLoginRequiredDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.login, color: AppTheme.primaryColor),
+            SizedBox(width: 12),
+            Text('Login Required'),
+          ],
+        ),
+        content: const Text(
+          'You need to be logged in to apply as a volunteer. Please login or create an account first.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Navigate to login screen if needed
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Login', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppTheme.backgroundColor,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(color: AppTheme.primaryColor),
+        ),
+      );
+    }
+
+    if (_error != null || _roleDetails == null) {
+      return Scaffold(
+        backgroundColor: AppTheme.backgroundColor,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color: AppTheme.errorColor.withValues(alpha: 0.7),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Failed to load details',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _loadRoleDetails,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final event = _roleDetails!.event;
+    final role = _roleDetails!.role;
+
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       body: CustomScrollView(
@@ -34,18 +224,15 @@ class VolunteerDetailsScreen extends StatelessWidget {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.network(
-                    opportunity.imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                        child: const Center(
-                          child: Icon(Icons.volunteer_activism, size: 80, color: AppTheme.primaryColor),
-                        ),
-                      );
-                    },
-                  ),
+                  event.imageUrl.isNotEmpty
+                      ? Image.network(
+                          event.imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return _buildPlaceholderImage();
+                          },
+                        )
+                      : _buildPlaceholderImage(),
                   Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -69,29 +256,13 @@ class VolunteerDetailsScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Category and spots left badges
+                  // Spots left badge
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryColor,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          opportunity.eventCategory,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          color: opportunity.isUrgent
+                          color: role.isUrgent
                               ? AppTheme.warningColor.withValues(alpha: 0.1)
                               : AppTheme.successColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
@@ -101,14 +272,14 @@ class VolunteerDetailsScreen extends StatelessWidget {
                           children: [
                             Icon(
                               Icons.people_alt_rounded,
-                              color: opportunity.isUrgent ? AppTheme.warningColor : AppTheme.successColor,
+                              color: role.isUrgent ? AppTheme.warningColor : AppTheme.successColor,
                               size: 14,
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              '${opportunity.spotsLeft} spots left',
+                              '${role.spotsLeft} spots left',
                               style: TextStyle(
-                                color: opportunity.isUrgent ? AppTheme.warningColor : AppTheme.successColor,
+                                color: role.isUrgent ? AppTheme.warningColor : AppTheme.successColor,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -116,12 +287,20 @@ class VolunteerDetailsScreen extends StatelessWidget {
                           ],
                         ),
                       ),
+                      const Spacer(),
+                      Text(
+                        'Total: ${role.limit} volunteers',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
                   // Event name
                   Text(
-                    opportunity.eventName,
+                    event.name,
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -145,13 +324,14 @@ class VolunteerDetailsScreen extends StatelessWidget {
                     ),
                     child: Column(
                       children: [
-                        _buildInfoRow(Icons.calendar_today, 'Date', _formatDate(opportunity.eventDate)),
-                        const Divider(height: 24),
-                        _buildInfoRow(Icons.access_time, 'Time', opportunity.eventTime),
-                        const Divider(height: 24),
-                        _buildInfoRow(Icons.location_on, 'Venue', opportunity.venue),
-                        const Divider(height: 24),
-                        _buildInfoRow(Icons.schedule, 'Duration', opportunity.duration),
+                        if (event.date != null)
+                          _buildInfoRow(Icons.calendar_today, 'Date', _formatDate(event.date!)),
+                        if (event.date != null) const Divider(height: 24),
+                        if (event.venue != null)
+                          _buildInfoRow(Icons.location_on, 'Venue', event.venue!),
+                        if (event.venue != null && event.location != null) const Divider(height: 24),
+                        if (event.location != null)
+                          _buildInfoRow(Icons.map_outlined, 'Location', event.location!),
                       ],
                     ),
                   ),
@@ -200,7 +380,7 @@ class VolunteerDetailsScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                opportunity.roleTitle,
+                                role.title,
                                 style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -215,104 +395,110 @@ class VolunteerDetailsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
                   // Role description
-                  _buildSectionTitle('Role Description'),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(
-                      opportunity.roleDescription,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        color: AppTheme.textSecondary,
-                        height: 1.6,
+                  if (role.description.isNotEmpty) ...[
+                    _buildSectionTitle('Role Description'),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        role.description,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: AppTheme.textSecondary,
+                          height: 1.6,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 24),
+                  ],
                   // Requirements
-                  _buildSectionTitle('Requirements'),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      children: opportunity.requirements.map((req) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Icon(
-                                Icons.check_circle,
-                                color: AppTheme.primaryColor,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  req,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: AppTheme.textSecondary,
-                                    height: 1.4,
+                  if (role.requirements.isNotEmpty) ...[
+                    _buildSectionTitle('Requirements'),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        children: role.requirements.map((req) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(
+                                  Icons.check_circle,
+                                  color: AppTheme.primaryColor,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    req,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: AppTheme.textSecondary,
+                                      height: 1.4,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  // Benefits
-                  _buildSectionTitle('Benefits'),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppTheme.successColor.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: AppTheme.successColor.withValues(alpha: 0.2),
+                              ],
+                            ),
+                          );
+                        }).toList(),
                       ),
                     ),
-                    child: Column(
-                      children: opportunity.benefits.map((benefit) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Icon(
-                                Icons.star_rounded,
-                                color: AppTheme.successColor,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  benefit,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: AppTheme.textSecondary,
-                                    height: 1.4,
+                    const SizedBox(height: 24),
+                  ],
+                  // Benefits
+                  if (role.benefits.isNotEmpty) ...[
+                    _buildSectionTitle('Benefits'),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.successColor.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppTheme.successColor.withValues(alpha: 0.2),
+                        ),
+                      ),
+                      child: Column(
+                        children: role.benefits.map((benefit) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(
+                                  Icons.star_rounded,
+                                  color: AppTheme.successColor,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    benefit,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: AppTheme.textSecondary,
+                                      height: 1.4,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
                     ),
-                  ),
+                  ],
                   const SizedBox(height: 100),
                 ],
               ),
@@ -334,32 +520,54 @@ class VolunteerDetailsScreen extends StatelessWidget {
         ),
         child: SafeArea(
           child: ElevatedButton(
-            onPressed: () => _applyAsVolunteer(context),
+            onPressed: role.spotsLeft > 0 && !_isApplying ? _applyAsVolunteer : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
+              backgroundColor: role.spotsLeft > 0 ? AppTheme.primaryColor : AppTheme.textLight,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
               elevation: 0,
+              disabledBackgroundColor: AppTheme.textLight.withValues(alpha: 0.5),
             ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.volunteer_activism, color: Colors.white),
-                SizedBox(width: 8),
-                Text(
-                  'Apply as Volunteer',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+            child: _isApplying
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: Colors.white,
+                    ),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        role.spotsLeft > 0 ? Icons.volunteer_activism : Icons.block,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        role.spotsLeft > 0 ? 'Apply as Volunteer' : 'No Spots Available',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholderImage() {
+    return Container(
+      color: AppTheme.primaryColor.withValues(alpha: 0.1),
+      child: const Center(
+        child: Icon(Icons.volunteer_activism, size: 80, color: AppTheme.primaryColor),
       ),
     );
   }
@@ -427,30 +635,13 @@ class VolunteerDetailsScreen extends StatelessWidget {
     );
   }
 
-  void _applyAsVolunteer(BuildContext context) {
-    HapticFeedback.mediumImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.white),
-            SizedBox(width: 12),
-            Text('Your volunteer request has been sent!'),
-          ],
-        ),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: AppTheme.primaryColor,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        margin: const EdgeInsets.all(16),
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  String _formatDate(String dateString) {
+    try {
+      final date = DateTime.parse(dateString);
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return '${months[date.month - 1]} ${date.day}, ${date.year}';
+    } catch (e) {
+      return dateString;
+    }
   }
 }

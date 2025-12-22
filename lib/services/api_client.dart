@@ -339,4 +339,64 @@ class ApiClient {
       rethrow;
     }
   }
+
+  // ============================================================
+  // EMAIL VERIFICATION (OTP)
+  // ============================================================
+
+  /// Verify email with OTP code.
+  ///
+  /// POST /api/auth/verify-otp
+  ///
+  /// [email] - User's email address
+  /// [code] - 6-digit verification code
+  ///
+  /// Returns 200 on success with 'message' and optionally 'token' for auto-login.
+  static Future<http.Response> verifyOtp(String email, String code) async {
+    final url = Uri.parse('$baseUrl/api/auth/verify-otp');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: json.encode({
+          'email': email,
+          'code': code,
+        }),
+      );
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Resend verification code.
+  ///
+  /// POST /api/auth/resend-code
+  ///
+  /// [email] - User's email address
+  ///
+  /// Returns 200 on success with 'message'.
+  static Future<http.Response> resendVerificationCode(String email) async {
+    final url = Uri.parse('$baseUrl/api/auth/resend-code');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: json.encode({
+          'email': email,
+        }),
+      );
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
 }

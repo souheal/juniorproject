@@ -12,15 +12,15 @@ class VerifyEmailMail extends Mailable
     use Queueable, SerializesModels;
 
     public User $user;
-    public string $verificationUrl;
+    public string $otpCode;
 
     /**
      * Create a new message instance.
      */
-    public function __construct(User $user, string $verificationUrl)
+    public function __construct(User $user, string $otpCode)
     {
         $this->user = $user;
-        $this->verificationUrl = $verificationUrl;
+        $this->otpCode = $otpCode;
     }
 
     /**
@@ -28,11 +28,11 @@ class VerifyEmailMail extends Mailable
      */
     public function build()
     {
-        return $this->subject('Verify your email - EventPro')
-                    ->view('emails.verify-email-plain')
+        return $this->subject('Your Verification Code - Eventy')
+                    ->view('emails.verify-email-otp')
                     ->with([
                         'user' => $this->user,
-                        'verificationUrl' => $this->verificationUrl,
+                        'otpCode' => $this->otpCode,
                     ]);
     }
 }

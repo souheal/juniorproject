@@ -7,11 +7,11 @@ import '../config.dart';
 /// {
 ///   "user": {
 ///     "id": 1,
-///     "name": "John Doe",
+///     "name": "John Doe",س
 ///     "email": "john@example.com",
 ///     "phone": "+1234567890",
 ///     "location": "Damascus",
-///     "picture": "http://192.168.1.12:8000/storage/users/abc123.jpg",
+///     "picture": "http://10.74.241.124:8000/storage/users/abc123.jpg",
 ///     "email_verified": true,
 ///     "notifications_enabled": true,
 ///     "account_type": "user"

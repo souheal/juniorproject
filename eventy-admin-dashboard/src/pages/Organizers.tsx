@@ -1,117 +1,41 @@
-import { UserCheck, Search, Clock, CheckCircle, XCircle, Eye, X, Calendar, MapPin, Users, Ticket, Mail, Phone, Building } from 'lucide-react';
+import { UserCheck, Search, Clock, CheckCircle, XCircle, Eye, X, Calendar, MapPin, Users, Ticket, Mail, Phone, Building, AlertCircle } from 'lucide-react';
 import { StatsCard } from '@/components/common/StatsCard';
 import { StatusBadge } from '@/components/common/StatusBadge';
-import { useState } from 'react';
-
-interface OrganizerEvent {
-  id: number;
-  title: string;
-  date: string;
-  location: string;
-  attendees: number;
-  tickets_sold: number;
-  status: 'published' | 'draft' | 'completed' | 'cancelled';
-}
-
-interface OrganizerRequest {
-  id: number;
-  name: string;
-  organization: string;
-  email: string;
-  phone: string;
-  status: 'pending' | 'approved' | 'rejected';
-  date: string;
-  documents: number;
-  bio: string;
-  events: OrganizerEvent[];
-}
+import { useState, useEffect } from 'react';
+import { organizersAPI, type OrganizerRequest, type OrganizersStats } from '@/lib/api/organizers';
 
 export function Organizers() {
+  const [requests, setRequests] = useState<OrganizerRequest[]>([]);
+  const [stats, setStats] = useState<OrganizersStats | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrganizer, setSelectedOrganizer] = useState<OrganizerRequest | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState<number | null>(null);
 
-  // Mock data - replace with real API calls
-  const stats = [
-    { title: 'Total Requests', value: '156', icon: UserCheck, iconColor: 'text-blue-600', iconBgColor: 'bg-blue-100' },
-    { title: 'Pending', value: '23', icon: Clock, iconColor: 'text-yellow-600', iconBgColor: 'bg-yellow-100' },
-    { title: 'Approved', value: '112', icon: CheckCircle, iconColor: 'text-green-600', iconBgColor: 'bg-green-100' },
-    { title: 'Rejected', value: '21', icon: XCircle, iconColor: 'text-red-600', iconBgColor: 'bg-red-100' },
-  ];
+  useEffect(() => {
+    fetchRequests();
+  }, []);
 
-  const requests: OrganizerRequest[] = [
-    {
-      id: 1,
-      name: 'John Doe',
-      organization: 'Tech Events Co.',
-      email: 'john@techevents.com',
-      phone: '+963 912 345 678',
-      status: 'pending',
-      date: '2025-01-15',
-      documents: 3,
-      bio: 'Professional event organizer with 5+ years of experience in tech conferences and workshops.',
-      events: [],
-    },
-    {
-      id: 2,
-      name: 'Jane Smith',
-      organization: 'Music Festival Group',
-      email: 'jane@musicfest.com',
-      phone: '+963 933 456 789',
-      status: 'approved',
-      date: '2025-01-14',
-      documents: 5,
-      bio: 'Passionate about bringing live music experiences to audiences across Syria.',
-      events: [
-        { id: 101, title: 'Summer Music Festival 2025', date: '2025-06-15', location: 'Damascus', attendees: 1500, tickets_sold: 1200, status: 'published' },
-        { id: 102, title: 'Jazz Night', date: '2025-02-20', location: 'Aleppo', attendees: 300, tickets_sold: 280, status: 'published' },
-        { id: 103, title: 'Classical Concert', date: '2024-12-10', location: 'Latakia', attendees: 450, tickets_sold: 450, status: 'completed' },
-      ],
-    },
-    {
-      id: 3,
-      name: 'Mike Johnson',
-      organization: 'Sports Events Ltd',
-      email: 'mike@sportsevents.com',
-      phone: '+963 944 567 890',
-      status: 'rejected',
-      date: '2025-01-10',
-      documents: 2,
-      bio: 'Sports enthusiast organizing local tournaments and competitions.',
-      events: [],
-    },
-    {
-      id: 4,
-      name: 'Sarah Williams',
-      organization: 'Art Gallery Events',
-      email: 'sarah@artgallery.com',
-      phone: '+963 955 678 901',
-      status: 'pending',
-      date: '2025-01-08',
-      documents: 4,
-      bio: 'Curator and event planner specializing in art exhibitions and cultural events.',
-      events: [],
-    },
-    {
-      id: 5,
-      name: 'Tom Brown',
-      organization: 'Conference Organizers',
-      email: 'tom@conferences.com',
-      phone: '+963 966 789 012',
-      status: 'approved',
-      date: '2025-01-05',
-      documents: 6,
-      bio: 'Expert in organizing business conferences and corporate events.',
-      events: [
-        { id: 201, title: 'Tech Summit 2025', date: '2025-03-10', location: 'Damascus', attendees: 800, tickets_sold: 650, status: 'published' },
-        { id: 202, title: 'Startup Workshop', date: '2025-02-05', location: 'Homs', attendees: 150, tickets_sold: 120, status: 'published' },
-        { id: 203, title: 'Business Networking', date: '2025-01-25', location: 'Damascus', attendees: 200, tickets_sold: 180, status: 'draft' },
-        { id: 204, title: 'Annual Conference 2024', date: '2024-11-15', location: 'Aleppo', attendees: 500, tickets_sold: 500, status: 'completed' },
-      ],
-    },
-  ];
+  const fetchRequests = async () => {
+    setIsLoading(true);
+    setError(null);
 
+    try {
+      const response = await organizersAPI.getRequests();
+      setRequests(response.requests);
+      setStats(response.stats);
+    } catch (err: any) {
+      console.error('Failed to fetch organizer requests:', err);
+      setError(err.message || 'Failed to load organizer requests');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Filter requests
   const filteredRequests = requests
     .filter(r => selectedTab === 'all' || r.status === selectedTab)
     .filter(r =>
@@ -121,14 +45,59 @@ export function Organizers() {
       r.email.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-  const handleApprove = (id: number) => {
-    console.log('Approve request:', id);
-    // TODO: Implement approve logic
+  // Stats cards
+  const statsCards = stats ? [
+    { title: 'Total Requests', value: stats.total.toString(), icon: UserCheck, iconColor: 'text-blue-600', iconBgColor: 'bg-blue-100' },
+    { title: 'Pending', value: stats.pending.toString(), icon: Clock, iconColor: 'text-yellow-600', iconBgColor: 'bg-yellow-100' },
+    { title: 'Approved', value: stats.approved.toString(), icon: CheckCircle, iconColor: 'text-green-600', iconBgColor: 'bg-green-100' },
+    { title: 'Rejected', value: stats.rejected.toString(), icon: XCircle, iconColor: 'text-red-600', iconBgColor: 'bg-red-100' },
+  ] : [];
+
+  const handleApprove = async (id: number) => {
+    setIsProcessing(id);
+    try {
+      await organizersAPI.approveRequest(id);
+      // Update local state
+      setRequests(requests.map(r =>
+        r.id === id ? { ...r, status: 'approved' as const } : r
+      ));
+      // Update stats
+      if (stats) {
+        setStats({
+          ...stats,
+          pending: stats.pending - 1,
+          approved: stats.approved + 1,
+        });
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to approve request');
+    } finally {
+      setIsProcessing(null);
+    }
   };
 
-  const handleReject = (id: number) => {
-    console.log('Reject request:', id);
-    // TODO: Implement reject logic
+  const handleReject = async (id: number) => {
+    const reason = prompt('Enter rejection reason (optional):');
+    setIsProcessing(id);
+    try {
+      await organizersAPI.rejectRequest(id, reason || undefined);
+      // Update local state
+      setRequests(requests.map(r =>
+        r.id === id ? { ...r, status: 'rejected' as const } : r
+      ));
+      // Update stats
+      if (stats) {
+        setStats({
+          ...stats,
+          pending: stats.pending - 1,
+          rejected: stats.rejected + 1,
+        });
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to reject request');
+    } finally {
+      setIsProcessing(null);
+    }
   };
 
   const handleViewDetails = (organizer: OrganizerRequest) => {
@@ -157,6 +126,14 @@ export function Organizers() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -165,9 +142,25 @@ export function Organizers() {
         <p className="text-gray-500 mt-1">Review and manage organizer applications</p>
       </div>
 
+      {/* Error Alert */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm text-red-800">{error}</p>
+            <button
+              onClick={fetchRequests}
+              className="text-sm text-red-600 hover:text-red-800 font-medium mt-1"
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {stats.map((stat, index) => (
+        {statsCards.map((stat, index) => (
           <StatsCard key={index} {...stat} />
         ))}
       </div>
@@ -177,10 +170,10 @@ export function Organizers() {
         <div className="border-b border-gray-200">
           <nav className="flex space-x-4 px-6" aria-label="Tabs">
             {[
-              { key: 'all', label: 'All Requests', count: requests.length },
-              { key: 'pending', label: 'Pending', count: requests.filter(r => r.status === 'pending').length },
-              { key: 'approved', label: 'Approved', count: requests.filter(r => r.status === 'approved').length },
-              { key: 'rejected', label: 'Rejected', count: requests.filter(r => r.status === 'rejected').length },
+              { key: 'all', label: 'All Requests', count: stats?.total || 0 },
+              { key: 'pending', label: 'Pending', count: stats?.pending || 0 },
+              { key: 'approved', label: 'Approved', count: stats?.approved || 0 },
+              { key: 'rejected', label: 'Rejected', count: stats?.rejected || 0 },
             ].map((tab) => (
               <button
                 key={tab.key}
@@ -242,11 +235,9 @@ export function Organizers() {
                       <p className="text-sm text-gray-500 mt-1">{request.email}</p>
                       <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
                         <span>Applied: {new Date(request.date).toLocaleDateString()}</span>
-                        <span>•</span>
-                        <span>{request.documents} documents</span>
                         {request.status === 'approved' && request.events.length > 0 && (
                           <>
-                            <span>•</span>
+                            <span>-</span>
                             <span className="text-blue-600 font-medium">{request.events.length} events</span>
                           </>
                         )}
@@ -256,7 +247,7 @@ export function Organizers() {
 
                   {/* Actions */}
                   <div className="flex items-center space-x-2 ml-4">
-                    {/* View Details Button - Always visible */}
+                    {/* View Details Button */}
                     <button
                       type="button"
                       onClick={() => handleViewDetails(request)}
@@ -272,15 +263,21 @@ export function Organizers() {
                         <button
                           type="button"
                           onClick={() => handleApprove(request.id)}
-                          className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                          disabled={isProcessing === request.id}
+                          className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
                         >
-                          <CheckCircle className="w-4 h-4 mr-2" />
+                          {isProcessing === request.id ? (
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                          ) : (
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                          )}
                           Approve
                         </button>
                         <button
                           type="button"
                           onClick={() => handleReject(request.id)}
-                          className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                          disabled={isProcessing === request.id}
+                          className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
                         >
                           <XCircle className="w-4 h-4 mr-2" />
                           Reject
@@ -332,7 +329,7 @@ export function Organizers() {
                         <h3 className="text-2xl font-bold text-gray-900">{selectedOrganizer.name}</h3>
                         <StatusBadge status={selectedOrganizer.status} />
                       </div>
-                      <p className="text-gray-600 mt-1">{selectedOrganizer.bio}</p>
+                      <p className="text-gray-600 mt-1">{selectedOrganizer.bio || 'No bio provided'}</p>
 
                       <div className="grid grid-cols-2 gap-4 mt-4">
                         <div className="flex items-center text-gray-600">
@@ -345,7 +342,7 @@ export function Organizers() {
                         </div>
                         <div className="flex items-center text-gray-600">
                           <Phone className="w-4 h-4 mr-2 text-gray-400" />
-                          <span>{selectedOrganizer.phone}</span>
+                          <span>{selectedOrganizer.phone || 'No phone'}</span>
                         </div>
                         <div className="flex items-center text-gray-600">
                           <Calendar className="w-4 h-4 mr-2 text-gray-400" />

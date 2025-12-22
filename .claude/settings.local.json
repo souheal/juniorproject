@@ -19,7 +19,9 @@
       "Bash(findstr:*)",
       "Bash(git checkout:*)",
       "Bash(del \"C:\\\\Users\\\\Owner\\\\juniorproject\\\\lib\\\\screens\\\\profile\\\\become_organizer_screen.dart\")",
-      "Bash(del \"C:\\\\Users\\\\Owner\\\\juniorproject\\\\lib\\\\services\\\\organizer_request_service.dart\")"
+      "Bash(del \"C:\\\\Users\\\\Owner\\\\juniorproject\\\\lib\\\\services\\\\organizer_request_service.dart\")",
+      "Bash(dir \"C:\\\\Users\\\\Owner\\\\juniorproject\\\\laravel\\\\storage\\\\logs\" /b)",
+      "Bash(powershell -Command:*)"
     ],
     "deny": [],
     "ask": []

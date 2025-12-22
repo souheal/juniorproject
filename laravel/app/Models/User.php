@@ -21,8 +21,9 @@ class User extends Authenticatable
         'birth_date',
         'password',
         'email_verification_token',
+        'otp_expires_at',
         'last_login_ip',
-        'notifications_enabled',   // 👈 new field for the profile toggle
+        'notifications_enabled',
     ];
 
     protected $hidden = [
@@ -34,8 +35,9 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at'     => 'datetime',
-            'password'              => 'hashed',   // Laravel 11 auto-hash
-            'notifications_enabled' => 'boolean',  // 👈 cast toggle to bool
+            'otp_expires_at'        => 'datetime',
+            'password'              => 'hashed',
+            'notifications_enabled' => 'boolean',
         ];
     }
 

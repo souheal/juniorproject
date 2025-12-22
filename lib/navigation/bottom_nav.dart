@@ -5,6 +5,9 @@ import '../screens/events/events_home_screen.dart';
 import '../screens/tickets/tickets_screen.dart';
 import '../screens/volunteer/volunteer_list_screen.dart';
 import '../screens/profile/profile_screen.dart';
+import '../screens/organizer/organizer_dashboard_screen.dart';
+import '../services/organizer_storage_service.dart';
+import '../models/organizer_models.dart';
 
 class MainNavigation extends StatefulWidget {
   final VoidCallback? onLogout;
@@ -17,27 +20,74 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> with TickerProviderStateMixin {
   int _currentIndex = 0;
-  late final List<Widget> _screens;
-  late final List<AnimationController> _animationControllers;
+  List<Widget> _screens = [];
+  List<AnimationController> _animationControllers = [];
+  bool _isOrganizer = false;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _screens = [
-      const EventsHomeScreen(),
-      const TicketsScreen(),  // New screen with real API integration
-      const VolunteerListScreen(),
-      ProfileScreen(onLogout: widget.onLogout),
-    ];
+    _checkOrganizerStatus();
+  }
 
-    _animationControllers = List.generate(
-      4,
-      (index) => AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 200),
-      ),
-    );
-    _animationControllers[0].value = 1.0;
+  Future<void> _checkOrganizerStatus() async {
+    await OrganizerStorageService.init();
+    final status = await OrganizerStorageService.getApprovalStatus();
+
+    if (mounted) {
+      setState(() {
+        _isOrganizer = status == OrganizerApprovalStatus.approved;
+        _initializeScreens();
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _initializeScreens() {
+    // Dispose old controllers if any
+    for (var controller in _animationControllers) {
+      controller.dispose();
+    }
+
+    if (_isOrganizer) {
+      // 5 tabs: Events -> Tickets -> Volunteer -> Organizer -> Profile
+      _screens = [
+        const EventsHomeScreen(),
+        const TicketsScreen(),
+        const VolunteerListScreen(),
+        const OrganizerDashboardScreen(),
+        ProfileScreen(onLogout: widget.onLogout),
+      ];
+      _animationControllers = List.generate(
+        5,
+        (index) => AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 200),
+        ),
+      );
+    } else {
+      // 4 tabs: Events -> Tickets -> Volunteer -> Profile
+      _screens = [
+        const EventsHomeScreen(),
+        const TicketsScreen(),
+        const VolunteerListScreen(),
+        ProfileScreen(onLogout: widget.onLogout),
+      ];
+      _animationControllers = List.generate(
+        4,
+        (index) => AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 200),
+        ),
+      );
+    }
+
+    // Reset current index if it's out of bounds
+    if (_currentIndex >= _screens.length) {
+      _currentIndex = 0;
+    }
+    _animationControllers[_currentIndex].value = 1.0;
   }
 
   @override
@@ -65,6 +115,14 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: AppTheme.primaryColor),
+        ),
+      );
+    }
+
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
@@ -105,8 +163,15 @@ class _MainNavigationState extends State<MainNavigation> with TickerProviderStat
                   activeIcon: Icons.volunteer_activism,
                   label: 'Volunteer',
                 ),
+                if (_isOrganizer)
+                  _buildNavItem(
+                    index: 3,
+                    icon: Icons.dashboard_outlined,
+                    activeIcon: Icons.dashboard,
+                    label: 'Organizer',
+                  ),
                 _buildNavItem(
-                  index: 3,
+                  index: _isOrganizer ? 4 : 3,
                   icon: Icons.person_outline_rounded,
                   activeIcon: Icons.person_rounded,
                   label: 'Profile',

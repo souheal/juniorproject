@@ -2,96 +2,109 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { StatsCard } from '@/components/common/StatsCard';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { dashboardAPI, type DashboardResponse } from '@/lib/api/dashboard';
 import {
   Users,
   Calendar,
   UserCheck,
   TrendingUp,
   Clock,
-  CheckCircle2,
-  XCircle,
+  AlertCircle,
 } from 'lucide-react';
 
 export function Dashboard() {
   const { user } = useAuth();
+  const [data, setData] = useState<DashboardResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data - replace with real API calls
-  const stats = [
+  useEffect(() => {
+    fetchDashboard();
+  }, []);
+
+  const fetchDashboard = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await dashboardAPI.getDashboard();
+      setData(response);
+    } catch (err: any) {
+      console.error('Failed to fetch dashboard:', err);
+      setError(err.message || 'Failed to load dashboard data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Stats cards from API data
+  const stats = data ? [
     {
       title: 'Total Users',
-      value: '2,543',
+      value: data.stats.total_users.toLocaleString(),
       icon: Users,
-      trend: { value: 12.5, isPositive: true },
       iconColor: 'text-blue-600',
       iconBgColor: 'bg-blue-100',
     },
     {
       title: 'Total Events',
-      value: '156',
+      value: data.stats.total_events.toLocaleString(),
       icon: Calendar,
-      trend: { value: 8.2, isPositive: true },
       iconColor: 'text-purple-600',
       iconBgColor: 'bg-purple-100',
     },
     {
       title: 'Organizers',
-      value: '89',
+      value: data.stats.total_organizers.toLocaleString(),
       icon: UserCheck,
-      trend: { value: 3.1, isPositive: false },
       iconColor: 'text-green-600',
       iconBgColor: 'bg-green-100',
     },
     {
       title: 'Revenue',
-      value: '$45,231',
+      value: `$${(data.stats.total_revenue || 0).toLocaleString()}`,
       icon: TrendingUp,
-      trend: { value: 15.3, isPositive: true },
       iconColor: 'text-yellow-600',
       iconBgColor: 'bg-yellow-100',
     },
-  ];
+  ] : [];
 
-  const recentRequests = [
-    {
-      id: 1,
-      name: 'John Doe',
-      organization: 'Tech Events Co.',
-      status: 'pending' as const,
-      date: '2 hours ago',
-    },
-    {
-      id: 2,
-      name: 'Jane Smith',
-      organization: 'Music Festival Group',
-      status: 'approved' as const,
-      date: '5 hours ago',
-    },
-    {
-      id: 3,
-      name: 'Mike Johnson',
-      organization: 'Sports Events Ltd',
-      status: 'rejected' as const,
-      date: '1 day ago',
-    },
-  ];
-
-  const recentEvents = [
-    { id: 1, name: 'Tech Conference 2025', organizer: 'John Doe', date: '2025-01-15', status: 'published' as const },
-    { id: 2, name: 'Music Festival', organizer: 'Jane Smith', date: '2025-02-20', status: 'published' as const },
-    { id: 3, name: 'Sports Tournament', organizer: 'Mike Johnson', date: '2025-03-10', status: 'draft' as const },
-  ];
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl shadow-lg p-8 text-white">
         <h1 className="text-3xl font-bold mb-2">
-          Welcome back, {user?.name}! 👋
+          Welcome back, {user?.name}!
         </h1>
         <p className="text-blue-100">
           Here's what's happening with your platform today.
         </p>
       </div>
+
+      {/* Error Alert */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm text-red-800">{error}</p>
+            <button
+              onClick={fetchDashboard}
+              className="text-sm text-red-600 hover:text-red-800 font-medium mt-1"
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -99,6 +112,24 @@ export function Dashboard() {
           <StatsCard key={index} {...stat} />
         ))}
       </div>
+
+      {/* Pending Requests Alert */}
+      {data && data.stats.pending_requests > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Clock className="w-5 h-5 text-yellow-600" />
+            <p className="text-sm text-yellow-800">
+              You have <span className="font-bold">{data.stats.pending_requests}</span> pending organizer requests
+            </p>
+          </div>
+          <Link
+            to="/organizers"
+            className="text-sm bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors"
+          >
+            Review Now
+          </Link>
+        </div>
+      )}
 
       {/* Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -112,28 +143,35 @@ export function Dashboard() {
               to="/organizers"
               className="text-sm text-blue-600 hover:text-blue-700 font-medium"
             >
-              View all →
+              View all
             </Link>
           </div>
 
           <div className="space-y-4">
-            {recentRequests.map((request) => (
-              <div
-                key={request.id}
-                className="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex-1">
-                  <p className="font-medium text-gray-900">{request.name}</p>
-                  <p className="text-sm text-gray-500">{request.organization}</p>
+            {data?.recent_requests && data.recent_requests.length > 0 ? (
+              data.recent_requests.map((request) => (
+                <div
+                  key={request.id}
+                  className="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900">{request.name}</p>
+                    <p className="text-sm text-gray-500">{request.organization}</p>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <StatusBadge status={request.status} />
+                    <span className="text-xs text-gray-400 whitespace-nowrap">
+                      {request.date}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-4">
-                  <StatusBadge status={request.status} />
-                  <span className="text-xs text-gray-400 whitespace-nowrap">
-                    {request.date}
-                  </span>
-                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <UserCheck className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+                <p>No recent requests</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
 
@@ -147,25 +185,32 @@ export function Dashboard() {
               to="/events"
               className="text-sm text-blue-600 hover:text-blue-700 font-medium"
             >
-              View all →
+              View all
             </Link>
           </div>
 
           <div className="space-y-4">
-            {recentEvents.map((event) => (
-              <div
-                key={event.id}
-                className="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex-1">
-                  <p className="font-medium text-gray-900">{event.name}</p>
-                  <p className="text-sm text-gray-500">
-                    by {event.organizer} • {new Date(event.date).toLocaleDateString()}
-                  </p>
+            {data?.recent_events && data.recent_events.length > 0 ? (
+              data.recent_events.map((event) => (
+                <div
+                  key={event.id}
+                  className="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900">{event.name}</p>
+                    <p className="text-sm text-gray-500">
+                      by {event.organizer} - {new Date(event.date).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <StatusBadge status={event.status} />
                 </div>
-                <StatusBadge status={event.status} />
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <Calendar className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+                <p>No recent events</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>

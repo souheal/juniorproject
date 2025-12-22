@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import 'home_screen.dart';
+import 'otp_verification_screen.dart';
 import '../services/api_client.dart';
 import '../models/category_api_model.dart';
 import '../config.dart';
@@ -289,29 +290,12 @@ class _AuthScreenState extends State<AuthScreen> {
                           responseData['data']?['access_token'] ??
                           responseData['user']?['token'];
 
-          // Get profile provider
-          final profileProvider = context.read<ProfileProvider>();
-
-          // Try to set profile from response data first
-          if (responseData['user'] != null || responseData['data']?['user'] != null) {
-            // Backend returned user data - use it
-            profileProvider.setProfileFromRegistration(
-              responseData,
-              token: token,
-            );
-          } else {
-            // Backend didn't return user data - use form data
-            // This allows immediate access even without token/user from backend
-            profileProvider.setProfileFromBasicInfo(
-              name: _nameController.text.trim(),
-              email: _emailController.text.trim(),
-              phone: _phoneController.text.trim(),
-              location: _selectedCity,
-              token: token,
-            );
-          }
+          // Extract user data for OTP screen
+          final userData = responseData['user'] ?? responseData['data']?['user'];
 
           // Clear all form fields after successful signup
+          final email = _emailController.text.trim();
+
           setState(() {
             _isSubmitting = false;
             _clearAllFields();
@@ -327,15 +311,15 @@ class _AuthScreenState extends State<AuthScreen> {
             ),
           );
 
-          // Navigate directly to home - skip any verification screens
-          final completed = widget.onCompleted;
-          if (completed != null) {
-            completed(context);
-            return;
-          }
-
+          // Navigate to OTP verification screen
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute<void>(builder: (_) => const HomeScreen()),
+            MaterialPageRoute<void>(
+              builder: (_) => OtpVerificationScreen(
+                email: email,
+                token: token,
+                userData: userData,
+              ),
+            ),
           );
           return;
         } else if (response.statusCode == 422) {
@@ -452,7 +436,9 @@ class _AuthScreenState extends State<AuthScreen> {
 
           if (!mounted) return;
 
-          // Show friendly dialog instead of just a snackbar
+          final email = _emailController.text.trim();
+
+          // Show friendly dialog with option to verify
           showDialog(
             context: context,
             builder: (ctx) => AlertDialog(
@@ -474,12 +460,12 @@ class _AuthScreenState extends State<AuthScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Your account is not verified on the server yet.',
+                    'Your account is not verified yet.',
                     style: TextStyle(fontSize: 15),
                   ),
                   SizedBox(height: 12),
                   Text(
-                    'Please check your email inbox (and spam folder) for a verification link.',
+                    'Please verify your email to continue.',
                     style: TextStyle(
                       fontSize: 13,
                       color: Colors.grey,
@@ -490,7 +476,24 @@ class _AuthScreenState extends State<AuthScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: const Text('OK'),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    // Navigate to OTP screen
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => OtpVerificationScreen(
+                          email: email,
+                        ),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6A62FF),
+                  ),
+                  child: const Text('Verify Now'),
                 ),
               ],
             ),

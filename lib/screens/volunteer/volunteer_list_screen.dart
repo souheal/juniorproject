@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../models/volunteer_model.dart';
+import '../../services/volunteer_api_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/shimmer_loading.dart';
 import '../../widgets/empty_state.dart';
@@ -14,8 +14,9 @@ class VolunteerListScreen extends StatefulWidget {
 }
 
 class _VolunteerListScreenState extends State<VolunteerListScreen> {
-  List<VolunteerOpportunity> _opportunities = [];
+  List<VolunteerOpportunityDto> _opportunities = [];
   bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -24,13 +25,26 @@ class _VolunteerListScreenState extends State<VolunteerListScreen> {
   }
 
   Future<void> _loadOpportunities() async {
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (mounted) {
-      setState(() {
-        _opportunities = VolunteerOpportunity.getMockOpportunities();
-        _isLoading = false;
-      });
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final opportunities = await VolunteerApiService.getOpportunities();
+      if (mounted) {
+        setState(() {
+          _opportunities = opportunities;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -48,7 +62,7 @@ class _VolunteerListScreenState extends State<VolunteerListScreen> {
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
-            onPressed: () {},
+            onPressed: _loadOpportunities,
             icon: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -56,7 +70,7 @@ class _VolunteerListScreenState extends State<VolunteerListScreen> {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(
-                Icons.filter_list_rounded,
+                Icons.refresh_rounded,
                 color: AppTheme.primaryColor,
                 size: 20,
               ),
@@ -70,9 +84,11 @@ class _VolunteerListScreenState extends State<VolunteerListScreen> {
         color: AppTheme.primaryColor,
         child: _isLoading
             ? _buildLoadingState()
-            : _opportunities.isEmpty
-                ? _buildEmptyState()
-                : _buildOpportunitiesList(),
+            : _error != null
+                ? _buildErrorState()
+                : _opportunities.isEmpty
+                    ? _buildEmptyState()
+                    : _buildOpportunitiesList(),
       ),
     );
   }
@@ -83,6 +99,56 @@ class _VolunteerListScreenState extends State<VolunteerListScreen> {
       physics: const NeverScrollableScrollPhysics(),
       itemCount: 4,
       itemBuilder: (context, index) => const EventCardShimmer(),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline_rounded,
+              size: 64,
+              color: AppTheme.errorColor.withValues(alpha: 0.7),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Failed to load opportunities',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Please check your connection and try again',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppTheme.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _loadOpportunities,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -110,13 +176,16 @@ class _VolunteerListScreenState extends State<VolunteerListScreen> {
     );
   }
 
-  Widget _buildOpportunityCard(VolunteerOpportunity opportunity) {
+  Widget _buildOpportunityCard(VolunteerOpportunityDto opportunity) {
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => VolunteerDetailsScreen(opportunity: opportunity),
+            builder: (_) => VolunteerDetailsScreen(
+              eventId: opportunity.event.id,
+              roleType: opportunity.role.type,
+            ),
           ),
         );
       },
@@ -141,41 +210,17 @@ class _VolunteerListScreenState extends State<VolunteerListScreen> {
               children: [
                 ClipRRect(
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                  child: Image.network(
-                    opportunity.imageUrl,
-                    height: 140,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        height: 140,
-                        color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                        child: const Center(
-                          child: Icon(Icons.volunteer_activism, size: 50, color: AppTheme.primaryColor),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                // Category badge
-                Positioned(
-                  top: 12,
-                  left: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryColor,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      opportunity.eventCategory,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
+                  child: opportunity.event.imageUrl.isNotEmpty
+                      ? Image.network(
+                          opportunity.event.imageUrl,
+                          height: 140,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return _buildPlaceholderImage();
+                          },
+                        )
+                      : _buildPlaceholderImage(),
                 ),
                 // Volunteers needed badge
                 Positioned(
@@ -190,7 +235,7 @@ class _VolunteerListScreenState extends State<VolunteerListScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.people_alt_rounded,
                           color: Colors.white,
                           size: 14,
@@ -218,7 +263,7 @@ class _VolunteerListScreenState extends State<VolunteerListScreen> {
                 children: [
                   // Event name
                   Text(
-                    opportunity.eventName,
+                    opportunity.event.name,
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -245,7 +290,7 @@ class _VolunteerListScreenState extends State<VolunteerListScreen> {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          opportunity.roleTitle,
+                          opportunity.role.title,
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -256,50 +301,52 @@ class _VolunteerListScreenState extends State<VolunteerListScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // Date and location
-                  Row(
-                    children: [
-                      const Icon(Icons.calendar_today, size: 16, color: AppTheme.textSecondary),
-                      const SizedBox(width: 8),
-                      Text(
-                        _formatDate(opportunity.eventDate),
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      const Icon(Icons.schedule, size: 16, color: AppTheme.textSecondary),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          opportunity.duration,
+                  // Date and duration
+                  if (opportunity.event.date != null)
+                    Row(
+                      children: [
+                        const Icon(Icons.calendar_today, size: 16, color: AppTheme.textSecondary),
+                        const SizedBox(width: 8),
+                        Text(
+                          _formatDate(opportunity.event.date!),
                           style: const TextStyle(
                             fontSize: 14,
                             color: AppTheme.textSecondary,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
-                  ),
+                        if (opportunity.event.durationHours != null) ...[
+                          const SizedBox(width: 16),
+                          const Icon(Icons.schedule, size: 16, color: AppTheme.textSecondary),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${opportunity.event.durationHours}h',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on, size: 16, color: AppTheme.textSecondary),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          opportunity.venue,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: AppTheme.textSecondary,
+                  // Location
+                  if (opportunity.event.venue != null || opportunity.event.location != null)
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on, size: 16, color: AppTheme.textSecondary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            opportunity.event.venue ?? opportunity.event.location ?? '',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: AppTheme.textSecondary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
                 ],
               ),
             ),
@@ -309,8 +356,23 @@ class _VolunteerListScreenState extends State<VolunteerListScreen> {
     );
   }
 
-  String _formatDate(DateTime date) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  Widget _buildPlaceholderImage() {
+    return Container(
+      height: 140,
+      color: AppTheme.primaryColor.withValues(alpha: 0.1),
+      child: const Center(
+        child: Icon(Icons.volunteer_activism, size: 50, color: AppTheme.primaryColor),
+      ),
+    );
+  }
+
+  String _formatDate(String dateString) {
+    try {
+      final date = DateTime.parse(dateString);
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return '${months[date.month - 1]} ${date.day}, ${date.year}';
+    } catch (e) {
+      return dateString;
+    }
   }
 }

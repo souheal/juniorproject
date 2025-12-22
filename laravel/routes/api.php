@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\User\OrganizerRequestController;
 use App\Http\Controllers\Admin\OrganizerRequestAdminController;
+use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\User\VolunteerRequestController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\TicketController;
@@ -28,7 +29,10 @@ Route::prefix('auth')->group(function () {
     Route::post('/signup',   [AuthController::class, 'register']);
     Route::post('/login',    [AuthController::class, 'login']);
 
-    Route::get('/verify-email', [AuthController::class, 'verifyEmail']);
+    // Email verification
+    Route::get('/verify-email',  [AuthController::class, 'verifyEmail']);  // Legacy link-based
+    Route::post('/verify-otp',   [AuthController::class, 'verifyOtp']);    // New OTP-based
+    Route::post('/resend-code',  [AuthController::class, 'resendCode']);   // Resend OTP
 
     Route::post('/logout', [AuthController::class, 'logout'])
         ->middleware('auth:sanctum');
@@ -81,15 +85,24 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/organizer-requests',   [OrganizerRequestController::class, 'store']);
     Route::get('/organizer-requests/me', [OrganizerRequestController::class, 'myRequests']);
 
-    // ---------- Organizer Request – admin ----------
+    // ---------- Admin Dashboard ----------
     // ADMIN ONLY: All routes in this group require admin role
     Route::prefix('admin')->middleware('admin')->group(function () {
-        Route::get('/organizer-requests',               [OrganizerRequestAdminController::class, 'index']);
+        // Dashboard stats
+        Route::get('/dashboard', [AdminController::class, 'dashboard']);
+
+        // Users management
+        Route::get('/users', [AdminController::class, 'users']);
+        Route::get('/users/{id}', [AdminController::class, 'showUser']);
+
+        // Events management
+        Route::get('/events', [AdminController::class, 'events']);
+        Route::delete('/events/{id}', [AdminController::class, 'deleteEvent']);
+
+        // Organizer requests
+        Route::get('/organizer-requests', [AdminController::class, 'organizerRequests']);
         Route::post('/organizer-requests/{id}/approve', [OrganizerRequestAdminController::class, 'approve']);
         Route::post('/organizer-requests/{id}/reject',  [OrganizerRequestAdminController::class, 'reject']);
-
-        // Admin events delete
-        Route::delete('/events/{id}', [ManageEventController::class, 'destroy']);
     });
 
     // ---------- Notifications ----------

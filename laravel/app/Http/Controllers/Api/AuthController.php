@@ -124,15 +124,16 @@ class AuthController extends Controller
             }
         });
 
-        // Email verification token
-        $token = Str::random(64);
-        $user->email_verification_token = $token;
+        // Generate 6-digit OTP code
+        $otpCode = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        // Store OTP code with expiry (10 minutes)
+        $user->email_verification_token = $otpCode;
+        $user->otp_expires_at = now()->addMinutes(10);
         $user->save();
 
-        $verificationUrl = url('/api/auth/verify-email?token=' . $token);
-
         try {
-            Mail::to($user->email)->send(new VerifyEmailMail($user, $token));
+            Mail::to($user->email)->send(new VerifyEmailMail($user, $otpCode));
         } catch (\Throwable $e) {
             Log::error('Failed to send verification email', [
                 'user_id' => $user->id,
@@ -142,9 +143,8 @@ class AuthController extends Controller
         }
 
         return response()->json([
-            'message'          => 'User registered successfully',
-            'verification_url' => $verificationUrl,
-            'user'             => $user,
+            'message' => 'User registered successfully. Please check your email for the verification code.',
+            'user'    => $user,
         ], 201);
     }
 
@@ -216,6 +216,67 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * Verify email with OTP code.
+     */
+    public function verifyOtp(Request $request)
+    {
+        $request->validate([
+            'email' => ['required', 'email'],
+            'code'  => ['required', 'string', 'size:6'],
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (! $user) {
+            return response()->json([
+                'message' => 'User not found',
+            ], 404);
+        }
+
+        if ($user->email_verified_at !== null) {
+            return response()->json([
+                'message' => 'Email is already verified',
+            ], 200);
+        }
+
+        // Check if OTP matches
+        if ($user->email_verification_token !== $request->code) {
+            return response()->json([
+                'message' => 'Invalid verification code',
+            ], 400);
+        }
+
+        // Check if OTP is expired
+        if ($user->otp_expires_at && now()->gt($user->otp_expires_at)) {
+            return response()->json([
+                'message' => 'Verification code has expired. Please request a new one.',
+            ], 400);
+        }
+
+        // Mark email as verified
+        $user->email_verified_at        = now();
+        $user->email_verification_token = null;
+        $user->otp_expires_at           = null;
+        $user->save();
+
+        // Create token for auto-login
+        $user->tokens()->delete();
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        // Load user role for frontend
+        $user->load('role:id,name');
+
+        return response()->json([
+            'message' => 'Email verified successfully',
+            'user'    => $user,
+            'token'   => $token,
+        ], 200);
+    }
+
+    /**
+     * Legacy verify email (token link).
+     */
     public function verifyEmail(Request $request)
     {
         $request->validate([
@@ -238,10 +299,60 @@ class AuthController extends Controller
 
         $user->email_verified_at         = now();
         $user->email_verification_token  = null;
+        $user->otp_expires_at            = null;
         $user->save();
 
         return response()->json([
             'message' => 'Email verified successfully',
+        ], 200);
+    }
+
+    /**
+     * Resend verification code.
+     */
+    public function resendCode(Request $request)
+    {
+        $request->validate([
+            'email' => ['required', 'email'],
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (! $user) {
+            return response()->json([
+                'message' => 'User not found',
+            ], 404);
+        }
+
+        if ($user->email_verified_at !== null) {
+            return response()->json([
+                'message' => 'Email is already verified',
+            ], 200);
+        }
+
+        // Generate new 6-digit OTP code
+        $otpCode = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        $user->email_verification_token = $otpCode;
+        $user->otp_expires_at = now()->addMinutes(10);
+        $user->save();
+
+        try {
+            Mail::to($user->email)->send(new VerifyEmailMail($user, $otpCode));
+        } catch (\Throwable $e) {
+            Log::error('Failed to resend verification email', [
+                'user_id' => $user->id,
+                'email'   => $user->email,
+                'error'   => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to send verification email. Please try again.',
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => 'Verification code sent successfully',
         ], 200);
     }
 
