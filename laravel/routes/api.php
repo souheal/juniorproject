@@ -20,12 +20,17 @@ use App\Http\Controllers\Api\OrganizerEventStatsController;
 // ✅ NEW: volunteer opportunities browse endpoints
 use App\Http\Controllers\Api\VolunteerOpportunitiesController;
 
+// ✅ NEW: Admin Dashboard endpoints
+use App\Http\Controllers\Admin\UserAdminController;
+use App\Http\Controllers\Admin\EventAdminController;
+
 // =====================
 // Auth routes (public)
 // =====================
 Route::prefix('auth')->group(function () {
 
     Route::post('/register', [AuthController::class, 'register']);
+<<<<<<< HEAD
     Route::post('/signup',   [AuthController::class, 'register']);
     Route::post('/login',    [AuthController::class, 'login']);
 
@@ -36,6 +41,11 @@ Route::prefix('auth')->group(function () {
 
     Route::post('/logout', [AuthController::class, 'logout'])
         ->middleware('auth:sanctum');
+=======
+    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/verify-email-code', [AuthController::class, 'verifyEmailCode']);
+    Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
+>>>>>>> 19fd49b85ee6c681befb76b02d00bd9d32f5f81c
 
     // Password reset
     Route::post('/password/forgot', [PasswordResetController::class, 'requestReset']);
@@ -88,6 +98,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ---------- Admin Dashboard ----------
     // ADMIN ONLY: All routes in this group require admin role
     Route::prefix('admin')->middleware('admin')->group(function () {
+<<<<<<< HEAD
         // Dashboard stats
         Route::get('/dashboard', [AdminController::class, 'dashboard']);
 
@@ -103,6 +114,25 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/organizer-requests', [AdminController::class, 'organizerRequests']);
         Route::post('/organizer-requests/{id}/approve', [OrganizerRequestAdminController::class, 'approve']);
         Route::post('/organizer-requests/{id}/reject',  [OrganizerRequestAdminController::class, 'reject']);
+=======
+
+        // Organizer Requests
+        Route::get('/organizer-requests',               [OrganizerRequestAdminController::class, 'index']);
+        Route::post('/organizer-requests/{id}/approve', [OrganizerRequestAdminController::class, 'approve']);
+        Route::post('/organizer-requests/{id}/reject',  [OrganizerRequestAdminController::class, 'reject']);
+
+        // ✅ Admin Dashboard: Users
+        Route::get('/users', [UserAdminController::class, 'index']);
+        Route::delete('/users/{id}', [UserAdminController::class, 'destroy']);
+
+        // ✅ Admin Dashboard: Events (list + delete)
+        Route::get('/events', [EventAdminController::class, 'index']);
+        Route::delete('/events/{id}', [EventAdminController::class, 'destroy']);
+
+        // (اختياري) خليته مثل ما كان عندك — إذا بدك تحذف إيفنت عبر ManageEventController
+        // إذا ما بدك ازدواجية احذف هالسطر:
+        Route::delete('/events/{id}', [ManageEventController::class, 'destroy']);
+>>>>>>> 19fd49b85ee6c681befb76b02d00bd9d32f5f81c
     });
 
     // ---------- Notifications ----------
@@ -133,7 +163,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ---------- User: volunteer requests ----------
     Route::post('/events/{event}/volunteer-requests', [VolunteerRequestController::class, 'store']);
-    Route::get('/volunteer-requests/me',              [VolunteerRequestController::class, 'myRequests']);
+    Route::get('/volunteer-requests/me',[VolunteerRequestController::class, 'myRequests']);
 
     // ---------- Ticketing / Payments ----------
     Route::post('/events/{event}/checkout', [PaymentController::class, 'checkout']);
