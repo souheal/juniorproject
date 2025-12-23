@@ -283,6 +283,7 @@ class OrganizerEvent {
   final String? coverImagePath; // Local path or base64
   final List<String> galleryImagePaths;
   final List<EventTicket> tickets;
+  final List<VolunteerOpportunity> volunteerOpportunities;
   final OrganizerEventStatus status;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -304,6 +305,7 @@ class OrganizerEvent {
     this.coverImagePath,
     this.galleryImagePaths = const [],
     this.tickets = const [],
+    this.volunteerOpportunities = const [],
     this.status = OrganizerEventStatus.draft,
     required this.createdAt,
     required this.updatedAt,
@@ -349,6 +351,10 @@ class OrganizerEvent {
               ?.map((t) => EventTicket.fromJson(t as Map<String, dynamic>))
               .toList() ??
           [],
+      volunteerOpportunities: (json['volunteerOpportunities'] as List<dynamic>?)
+              ?.map((v) => VolunteerOpportunity.fromJson(v as Map<String, dynamic>))
+              .toList() ??
+          [],
       status: OrganizerEventStatus.fromString(json['status'] as String?),
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
@@ -371,6 +377,7 @@ class OrganizerEvent {
       'coverImagePath': coverImagePath,
       'galleryImagePaths': galleryImagePaths,
       'tickets': tickets.map((t) => t.toJson()).toList(),
+      'volunteerOpportunities': volunteerOpportunities.map((v) => v.toJson()).toList(),
       'status': status.toShortString(),
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
@@ -392,6 +399,7 @@ class OrganizerEvent {
     String? coverImagePath,
     List<String>? galleryImagePaths,
     List<EventTicket>? tickets,
+    List<VolunteerOpportunity>? volunteerOpportunities,
     OrganizerEventStatus? status,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -411,6 +419,7 @@ class OrganizerEvent {
       coverImagePath: coverImagePath ?? this.coverImagePath,
       galleryImagePaths: galleryImagePaths ?? this.galleryImagePaths,
       tickets: tickets ?? this.tickets,
+      volunteerOpportunities: volunteerOpportunities ?? this.volunteerOpportunities,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -677,6 +686,73 @@ class VolunteerApplication {
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+}
+
+/// Simple volunteer opportunity for event creation flow
+class VolunteerOpportunity {
+  final String id;
+  final String roleName;
+  final int capacity;
+  final String? duration;
+  final String? requirements;
+  final String? benefits;
+  final OpportunityStatus status;
+
+  VolunteerOpportunity({
+    required this.id,
+    required this.roleName,
+    required this.capacity,
+    this.duration,
+    this.requirements,
+    this.benefits,
+    this.status = OpportunityStatus.draft,
+  });
+
+  int get spotsLeft => capacity; // Initial spots = capacity
+
+  factory VolunteerOpportunity.fromJson(Map<String, dynamic> json) {
+    return VolunteerOpportunity(
+      id: json['id'] as String,
+      roleName: json['roleName'] as String,
+      capacity: json['capacity'] as int,
+      duration: json['duration'] as String?,
+      requirements: json['requirements'] as String?,
+      benefits: json['benefits'] as String?,
+      status: OpportunityStatus.fromString(json['status'] as String?),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'roleName': roleName,
+      'capacity': capacity,
+      'duration': duration,
+      'requirements': requirements,
+      'benefits': benefits,
+      'status': status.toShortString(),
+    };
+  }
+
+  VolunteerOpportunity copyWith({
+    String? id,
+    String? roleName,
+    int? capacity,
+    String? duration,
+    String? requirements,
+    String? benefits,
+    OpportunityStatus? status,
+  }) {
+    return VolunteerOpportunity(
+      id: id ?? this.id,
+      roleName: roleName ?? this.roleName,
+      capacity: capacity ?? this.capacity,
+      duration: duration ?? this.duration,
+      requirements: requirements ?? this.requirements,
+      benefits: benefits ?? this.benefits,
+      status: status ?? this.status,
     );
   }
 }

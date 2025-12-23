@@ -194,6 +194,9 @@ class AuthController extends Controller
             }
         }
 
+        // Load role relationship for admin dashboard check
+        $user->load('role:id,name');
+
         return response()->json([
             'message' => 'Login successful',
             'user'    => $user,

@@ -7,8 +7,6 @@ import '../../theme/app_theme.dart';
 import '../../utils/page_transitions.dart';
 import '../../providers/profile_provider.dart';
 import '../../widgets/error_retry_widget.dart';
-import '../../services/organizer_storage_service.dart';
-import '../../models/organizer_models.dart';
 import 'edit_profile_screen.dart';
 import 'settings_screen.dart';
 import 'about_app_screen.dart';
@@ -30,10 +28,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   late AnimationController _animationController;
   late Animation<double> _headerAnimation;
 
-  // Organizer approval status from localStorage
-  OrganizerApprovalStatus _organizerStatus = OrganizerApprovalStatus.none;
-  bool _isLoadingStatus = true;
-
   @override
   void initState() {
     super.initState();
@@ -47,22 +41,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     );
     _animationController.forward();
 
-    // Fetch profile data and organizer status on init
+    // Fetch profile data on init
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadProfile();
-      _loadOrganizerStatus();
     });
-  }
-
-  Future<void> _loadOrganizerStatus() async {
-    await OrganizerStorageService.init();
-    final status = await OrganizerStorageService.getApprovalStatus();
-    if (mounted) {
-      setState(() {
-        _organizerStatus = status;
-        _isLoadingStatus = false;
-      });
-    }
   }
 
   Future<void> _loadProfile() async {
@@ -162,7 +144,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                           const SizedBox(height: 24),
                           _buildSectionTitle('Preferences'),
                           const SizedBox(height: 12),
-                          _buildBecomeOrganizerButton(),
+                          _buildBecomeOrganizerButton(provider),
                           const SizedBox(height: 12),
                           _buildMenuItem(
                             icon: Icons.settings_outlined,
@@ -751,19 +733,19 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     );
   }
 
-  Widget _buildBecomeOrganizerButton() {
-    // Still loading status
-    if (_isLoadingStatus) {
+  Widget _buildBecomeOrganizerButton(ProfileProvider provider) {
+    final profile = provider.profile;
+    if (profile == null) return const SizedBox.shrink();
+
+    // Hide completely if user is already an organizer
+    if (profile.isOrganizer) {
       return const SizedBox.shrink();
     }
 
-    // Hide completely if approved (user now has Organizer tab)
-    if (_organizerStatus == OrganizerApprovalStatus.approved) {
-      return const SizedBox.shrink();
-    }
+    final accountTypeInfo = profile.accountTypeInfo;
 
     // Show rejected state with option to reapply
-    if (_organizerStatus == OrganizerApprovalStatus.rejected) {
+    if (accountTypeInfo.wasRejected) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(20),
@@ -818,36 +800,34 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () async {
-                  // Reset status and allow reapplication
-                  await OrganizerStorageService.setApprovalStatus(
-                    OrganizerApprovalStatus.none,
-                  );
-                  await OrganizerStorageService.clearOrganizerRequest();
-                  _loadOrganizerStatus();
-                },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.primaryColor,
-                  side: const BorderSide(color: AppTheme.primaryColor),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            if (accountTypeInfo.canApplyForOrganizer) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    _showBecomeOrganizerModal();
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.primaryColor,
+                    side: const BorderSide(color: AppTheme.primaryColor),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
+                  child: const Text('Apply Again'),
                 ),
-                child: const Text('Apply Again'),
               ),
-            ),
+            ],
           ],
         ),
       );
     }
 
     // Show pending state if request was submitted
-    if (_organizerStatus == OrganizerApprovalStatus.pending) {
+    if (accountTypeInfo.hasPendingRequest) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(20),
@@ -918,7 +898,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       );
     }
 
-    // Show button to apply as organizer (status == none)
+    // Show button to apply as organizer if allowed
+    if (!accountTypeInfo.canApplyForOrganizer) {
+      return const SizedBox.shrink();
+    }
+
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
@@ -1007,12 +991,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _BecomeOrganizerForm(
-        onSubmit: () {
-          // Reload status from storage
-          _loadOrganizerStatus();
-        },
-      ),
+      builder: (context) => const _BecomeOrganizerForm(),
     );
   }
 
@@ -1142,11 +1121,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 }
 
-/// Form widget for becoming an organizer (frontend-only UI)
+/// Form widget for becoming an organizer (calls real backend API)
 class _BecomeOrganizerForm extends StatefulWidget {
-  final VoidCallback onSubmit;
-
-  const _BecomeOrganizerForm({required this.onSubmit});
+  const _BecomeOrganizerForm();
 
   @override
   State<_BecomeOrganizerForm> createState() => _BecomeOrganizerFormState();
@@ -1164,8 +1141,8 @@ class _BecomeOrganizerFormState extends State<_BecomeOrganizerForm> {
 
   bool _isSubmitting = false;
 
-  // Max file size: 5MB in bytes
-  static const int _maxFileSizeBytes = 5 * 1024 * 1024;
+  // Max file size: 4MB in bytes (matching backend limit)
+  static const int _maxFileSizeBytes = 4 * 1024 * 1024;
 
   @override
   void dispose() {
@@ -1180,7 +1157,7 @@ class _BecomeOrganizerFormState extends State<_BecomeOrganizerForm> {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'],
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
         allowMultiple: false,
         withData: true, // Load file bytes for upload
       );
@@ -1189,7 +1166,7 @@ class _BecomeOrganizerFormState extends State<_BecomeOrganizerForm> {
         final file = result.files.first;
         final fileSize = file.size;
 
-        // Check file size (max 5MB)
+        // Check file size
         if (fileSize > _maxFileSizeBytes) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -1200,7 +1177,7 @@ class _BecomeOrganizerFormState extends State<_BecomeOrganizerForm> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'File size exceeds 5MB limit. Selected: ${_formatFileSize(fileSize)}',
+                        'File size exceeds 4MB limit. Selected: ${_formatFileSize(fileSize)}',
                         style: const TextStyle(fontWeight: FontWeight.w500),
                       ),
                     ),
@@ -1254,9 +1231,6 @@ class _BecomeOrganizerFormState extends State<_BecomeOrganizerForm> {
     switch (extension) {
       case 'pdf':
         return Icons.picture_as_pdf_rounded;
-      case 'doc':
-      case 'docx':
-        return Icons.description_rounded;
       case 'jpg':
       case 'jpeg':
       case 'png':
@@ -1275,47 +1249,68 @@ class _BecomeOrganizerFormState extends State<_BecomeOrganizerForm> {
       _isSubmitting = true;
     });
 
-    // Create and save organizer request to local storage
-    final request = OrganizerRequest(
-      id: OrganizerStorageService.generateId('req'),
+    // Submit request via ProfileProvider (calls real backend API)
+    final provider = context.read<ProfileProvider>();
+    final result = await provider.submitOrganizerRequest(
       organizationName: _organizationNameController.text.trim(),
       description: _descriptionController.text.trim(),
-      documentPaths: _selectedFileName != null ? [_selectedFileName!] : [],
-      createdAt: DateTime.now(),
-      status: OrganizerApprovalStatus.pending,
+      documentBytes: _selectedFile?.bytes,
+      documentFileName: _selectedFileName,
     );
 
-    await OrganizerStorageService.submitOrganizerRequest(request);
-
-    // Simulate a short delay for UI feedback
-    await Future.delayed(const Duration(milliseconds: 500));
-
     if (mounted) {
-      Navigator.pop(context);
-      widget.onSubmit();
+      setState(() {
+        _isSubmitting = false;
+      });
 
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.white, size: 20),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Text(
-                  'Your organizer request has been sent and is under review.',
-                  style: TextStyle(fontWeight: FontWeight.w500),
+      if (result.success) {
+        Navigator.pop(context);
+
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    result.message,
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
+            backgroundColor: AppTheme.successColor,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 4),
+            margin: const EdgeInsets.all(16),
           ),
-          backgroundColor: AppTheme.successColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          duration: const Duration(seconds: 4),
-          margin: const EdgeInsets.all(16),
-        ),
-      );
+        );
+      } else {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    result.message,
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: AppTheme.errorColor,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
     }
   }
 
@@ -1496,7 +1491,7 @@ class _BecomeOrganizerFormState extends State<_BecomeOrganizerForm> {
                         _buildLabel('Documents', required: false),
                         const Spacer(),
                         Text(
-                          'Max 5MB',
+                          'Max 4MB',
                           style: TextStyle(
                             fontSize: 12,
                             color: AppTheme.textLight,
@@ -1618,7 +1613,7 @@ class _BecomeOrganizerFormState extends State<_BecomeOrganizerForm> {
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                'PDF, DOC, DOCX, JPG, PNG (optional)',
+                                'PDF, JPG, PNG (optional)',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: AppTheme.textLight,
@@ -1628,105 +1623,6 @@ class _BecomeOrganizerFormState extends State<_BecomeOrganizerForm> {
                           ),
                         ),
                       ),
-                    const SizedBox(height: 24),
-
-                    // DEV ONLY: Admin approval simulation toggle
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.grey[300]!,
-                          width: 1,
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.developer_mode,
-                                color: Colors.grey[600],
-                                size: 18,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'DEV ONLY: Simulate Admin Action',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () async {
-                                    await OrganizerStorageService.setApprovalStatus(
-                                      OrganizerApprovalStatus.approved,
-                                    );
-                                    await OrganizerStorageService.createProfileFromRequest();
-                                    await OrganizerStorageService.initializeSampleData();
-                                    if (mounted) {
-                                      Navigator.pop(context);
-                                      widget.onSubmit();
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: const Text('DEV: Approved! Restart app to see Organizer tab.'),
-                                          backgroundColor: AppTheme.successColor,
-                                          behavior: SnackBarBehavior.floating,
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                        ),
-                                      );
-                                    }
-                                  },
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: AppTheme.successColor,
-                                    side: const BorderSide(color: AppTheme.successColor),
-                                    padding: const EdgeInsets.symmetric(vertical: 10),
-                                  ),
-                                  child: const Text('Approve'),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () async {
-                                    await OrganizerStorageService.setApprovalStatus(
-                                      OrganizerApprovalStatus.rejected,
-                                    );
-                                    if (mounted) {
-                                      Navigator.pop(context);
-                                      widget.onSubmit();
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: const Text('DEV: Request rejected.'),
-                                          backgroundColor: AppTheme.errorColor,
-                                          behavior: SnackBarBehavior.floating,
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                        ),
-                                      );
-                                    }
-                                  },
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: AppTheme.errorColor,
-                                    side: const BorderSide(color: AppTheme.errorColor),
-                                    padding: const EdgeInsets.symmetric(vertical: 10),
-                                  ),
-                                  child: const Text('Reject'),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
                     const SizedBox(height: 24),
 
                     // Submit Button

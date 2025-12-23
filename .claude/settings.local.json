@@ -21,7 +21,8 @@
       "Bash(del \"C:\\\\Users\\\\Owner\\\\juniorproject\\\\lib\\\\screens\\\\profile\\\\become_organizer_screen.dart\")",
       "Bash(del \"C:\\\\Users\\\\Owner\\\\juniorproject\\\\lib\\\\services\\\\organizer_request_service.dart\")",
       "Bash(dir \"C:\\\\Users\\\\Owner\\\\juniorproject\\\\laravel\\\\storage\\\\logs\" /b)",
-      "Bash(powershell -Command:*)"
+      "Bash(powershell -Command:*)",
+      "Bash(del \"C:\\\\Users\\\\Owner\\\\juniorproject\\\\eventy-admin-dashboard\\\\src\\\\pages\\\\Comments.tsx\")"
     ],
     "deny": [],
     "ask": []

@@ -399,4 +399,82 @@ class ApiClient {
       rethrow;
     }
   }
+
+  // ============================================================
+  // ORGANIZER REQUESTS
+  // ============================================================
+
+  /// Submit an organizer request.
+  ///
+  /// POST /api/organizer-requests
+  /// Requires authentication.
+  ///
+  /// [organizationName] - Name of the organization (required)
+  /// [description] - Description of the organization (required)
+  /// [documentBytes] - Optional document file bytes
+  /// [documentFileName] - Optional document file name
+  ///
+  /// Returns 201 on success with 'message' and 'request' object.
+  static Future<http.Response> submitOrganizerRequest({
+    required String organizationName,
+    required String description,
+    List<int>? documentBytes,
+    String? documentFileName,
+  }) async {
+    final url = Uri.parse('$baseUrl/api/organizer-requests');
+
+    try {
+      if (documentBytes != null && documentFileName != null) {
+        // Multipart request with file
+        var request = http.MultipartRequest('POST', url);
+        request.headers.addAll({
+          'Accept': 'application/json',
+          'Authorization': 'Bearer ${AuthHelper.token}',
+        });
+        request.fields['organization_name'] = organizationName;
+        request.fields['description'] = description;
+        request.files.add(http.MultipartFile.fromBytes(
+          'documents',
+          documentBytes,
+          filename: documentFileName,
+        ));
+
+        final streamedResponse = await request.send();
+        return await http.Response.fromStream(streamedResponse);
+      } else {
+        // Simple JSON request without file
+        final response = await http.post(
+          url,
+          headers: AuthHelper.headers,
+          body: json.encode({
+            'organization_name': organizationName,
+            'description': description,
+          }),
+        );
+        return response;
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Get current user's organizer requests.
+  ///
+  /// GET /api/organizer-requests/me
+  /// Requires authentication.
+  ///
+  /// Returns JSON array of organizer request objects.
+  static Future<http.Response> getMyOrganizerRequests() async {
+    final url = Uri.parse('$baseUrl/api/organizer-requests/me');
+
+    try {
+      final response = await http.get(
+        url,
+        headers: AuthHelper.headers,
+      );
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
 }

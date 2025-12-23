@@ -17,8 +17,26 @@ class CreateEventScreen extends StatefulWidget {
 
 class _CreateEventScreenState extends State<CreateEventScreen> {
   int _currentStep = 0;
-  final int _totalSteps = 4;
-  final _formKeys = List.generate(4, (_) => GlobalKey<FormState>());
+  final int _totalSteps = 5;
+  final _formKeys = List.generate(5, (_) => GlobalKey<FormState>());
+
+  // Syrian cities list (same as signup)
+  static const List<String> _syrianCities = [
+    'Damascus',
+    'Aleppo',
+    'Homs',
+    'Hama',
+    'Latakia',
+    'Tartus',
+    'Deir ez-Zor',
+    'Raqqa',
+    'Hasakah',
+    'Daraa',
+    'As-Suwayda',
+    'Idlib',
+    'Qamishli',
+    'Palmyra',
+  ];
 
   // Step 1: Event Info
   final _titleController = TextEditingController();
@@ -29,7 +47,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   DateTime _endDate = DateTime.now().add(const Duration(days: 7));
   TimeOfDay _endTime = const TimeOfDay(hour: 22, minute: 0);
   final _locationController = TextEditingController();
-  final _cityController = TextEditingController();
+  String? _selectedCity;
 
   // Step 2: Media
   String? _coverImageBase64;
@@ -37,6 +55,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
   // Step 3: Tickets
   List<EventTicket> _tickets = [];
+
+  // Step 4: Volunteer Opportunities
+  List<VolunteerOpportunity> _volunteerOpportunities = [];
 
   bool _isSubmitting = false;
   bool get _isEditing => widget.eventToEdit != null;
@@ -59,10 +80,11 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     _endDate = event.endDateTime;
     _endTime = TimeOfDay.fromDateTime(event.endDateTime);
     _locationController.text = event.location;
-    _cityController.text = event.city ?? '';
+    _selectedCity = event.city;
     _coverImageBase64 = event.coverImagePath;
     _galleryImagesBase64 = List.from(event.galleryImagePaths);
     _tickets = List.from(event.tickets);
+    _volunteerOpportunities = List.from(event.volunteerOpportunities);
   }
 
   @override
@@ -70,7 +92,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     _titleController.dispose();
     _descriptionController.dispose();
     _locationController.dispose();
-    _cityController.dispose();
     super.dispose();
   }
 
@@ -165,6 +186,11 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         _endTime.minute,
       );
 
+      // When publishing, set all volunteer opportunities status to published
+      final publishedOpportunities = _volunteerOpportunities.map((opp) {
+        return opp.copyWith(status: OpportunityStatus.published);
+      }).toList();
+
       final event = OrganizerEvent(
         id: _isEditing
             ? widget.eventToEdit!.id
@@ -176,12 +202,11 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         startDateTime: startDateTime,
         endDateTime: endDateTime,
         location: _locationController.text.trim(),
-        city: _cityController.text.trim().isEmpty
-            ? null
-            : _cityController.text.trim(),
+        city: _selectedCity,
         coverImagePath: _coverImageBase64,
         galleryImagePaths: _galleryImagesBase64,
         tickets: _tickets,
+        volunteerOpportunities: publishedOpportunities,
         status: OrganizerEventStatus.published,
         createdAt: _isEditing ? widget.eventToEdit!.createdAt : DateTime.now(),
         updatedAt: DateTime.now(),
@@ -248,12 +273,11 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         startDateTime: startDateTime,
         endDateTime: endDateTime,
         location: _locationController.text.trim(),
-        city: _cityController.text.trim().isEmpty
-            ? null
-            : _cityController.text.trim(),
+        city: _selectedCity,
         coverImagePath: _coverImageBase64,
         galleryImagePaths: _galleryImagesBase64,
         tickets: _tickets,
+        volunteerOpportunities: _volunteerOpportunities, // Keep as draft
         status: OrganizerEventStatus.draft,
         createdAt: _isEditing ? widget.eventToEdit!.createdAt : DateTime.now(),
         updatedAt: DateTime.now(),
@@ -383,6 +407,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       case 2:
         return 'Tickets';
       case 3:
+        return 'Volunteers';
+      case 4:
         return 'Review & Publish';
       default:
         return '';
@@ -398,6 +424,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       case 2:
         return _buildTicketsStep();
       case 3:
+        return _buildVolunteersStep();
+      case 4:
         return _buildReviewStep();
       default:
         return const SizedBox();
@@ -477,9 +505,16 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             const SizedBox(height: 20),
             _buildLabel('City'),
             const SizedBox(height: 8),
-            TextFormField(
-              controller: _cityController,
-              decoration: _buildInputDecoration('City name'),
+            DropdownButtonFormField<String>(
+              initialValue: _selectedCity,
+              decoration: _buildInputDecoration('Select city'),
+              items: _syrianCities
+                  .map((city) => DropdownMenuItem(
+                        value: city,
+                        child: Text(city),
+                      ))
+                  .toList(),
+              onChanged: (value) => setState(() => _selectedCity = value),
             ),
             const SizedBox(height: 32),
           ],
@@ -873,6 +908,235 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     );
   }
 
+  void _addVolunteerOpportunity() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _AddVolunteerModal(
+        onAdd: (opportunity) {
+          setState(() {
+            _volunteerOpportunities.add(opportunity);
+          });
+        },
+      ),
+    );
+  }
+
+  void _editVolunteerOpportunity(int index) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _AddVolunteerModal(
+        existingOpportunity: _volunteerOpportunities[index],
+        onAdd: (opportunity) {
+          setState(() {
+            _volunteerOpportunities[index] = opportunity;
+          });
+        },
+      ),
+    );
+  }
+
+  void _removeVolunteerOpportunity(int index) {
+    setState(() {
+      _volunteerOpportunities.removeAt(index);
+    });
+  }
+
+  Widget _buildVolunteersStep() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLabel('Volunteer Roles'),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Optional - Add roles for volunteers',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textLight,
+                    ),
+                  ),
+                ],
+              ),
+              TextButton.icon(
+                onPressed: _addVolunteerOpportunity,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add Role'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (_volunteerOpportunities.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: AppTheme.textLight.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.volunteer_activism_outlined,
+                    size: 48,
+                    color: AppTheme.textLight,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'No volunteer roles added',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Add roles to recruit volunteers for your event',
+                    style: TextStyle(
+                      color: AppTheme.textLight,
+                      fontSize: 13,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            )
+          else
+            ...List.generate(_volunteerOpportunities.length, (index) {
+              final opportunity = _volunteerOpportunities[index];
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppTheme.accentColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.volunteer_activism_rounded,
+                            color: AppTheme.accentColor,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                opportunity.roleName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${opportunity.capacity} spots available',
+                                style: TextStyle(
+                                  color: AppTheme.textSecondary,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => _editVolunteerOpportunity(index),
+                          icon: const Icon(Icons.edit_outlined),
+                          color: AppTheme.textSecondary,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        IconButton(
+                          onPressed: () => _removeVolunteerOpportunity(index),
+                          icon: const Icon(Icons.delete_outline),
+                          color: AppTheme.errorColor,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ],
+                    ),
+                    if (opportunity.duration != null && opportunity.duration!.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.schedule_outlined,
+                            size: 16,
+                            color: AppTheme.textLight,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            opportunity.duration!,
+                            style: TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (opportunity.requirements != null && opportunity.requirements!.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Requirements: ${opportunity.requirements}',
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 12,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    if (opportunity.benefits != null && opportunity.benefits!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Benefits: ${opportunity.benefits}',
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 12,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            }),
+          const SizedBox(height: 32),
+        ],
+      ),
+    );
+  }
+
   Widget _buildReviewStep() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -974,12 +1238,89 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                           '${_tickets.length} ticket type(s)',
                         ),
                       ],
+                      if (_volunteerOpportunities.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        _buildInfoRow(
+                          Icons.volunteer_activism_outlined,
+                          '${_volunteerOpportunities.length} volunteer role(s)',
+                        ),
+                      ],
                     ],
                   ),
                 ),
               ],
             ),
           ),
+          // Volunteer Opportunities Summary
+          if (_volunteerOpportunities.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.accentColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.volunteer_activism,
+                          color: AppTheme.accentColor,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Volunteer Opportunities',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ..._volunteerOpportunities.map((opp) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.circle,
+                          size: 6,
+                          color: AppTheme.textLight,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${opp.roleName} (${opp.capacity} spots)',
+                            style: TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 24),
           Container(
             padding: const EdgeInsets.all(16),
@@ -997,10 +1338,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   color: AppTheme.successColor,
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Your event is ready to be published!',
-                    style: TextStyle(
+                    _volunteerOpportunities.isNotEmpty
+                        ? 'Your event and volunteer opportunities are ready to be published!'
+                        : 'Your event is ready to be published!',
+                    style: const TextStyle(
                       color: AppTheme.successColor,
                       fontWeight: FontWeight.w500,
                     ),
@@ -1308,6 +1651,192 @@ class _AddTicketModalState extends State<_AddTicketModal> {
                     ),
                   ),
                   child: const Text('Add Ticket'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Modal for adding/editing a volunteer opportunity
+class _AddVolunteerModal extends StatefulWidget {
+  final Function(VolunteerOpportunity) onAdd;
+  final VolunteerOpportunity? existingOpportunity;
+
+  const _AddVolunteerModal({
+    required this.onAdd,
+    this.existingOpportunity,
+  });
+
+  @override
+  State<_AddVolunteerModal> createState() => _AddVolunteerModalState();
+}
+
+class _AddVolunteerModalState extends State<_AddVolunteerModal> {
+  final _formKey = GlobalKey<FormState>();
+  final _roleNameController = TextEditingController();
+  final _capacityController = TextEditingController(text: '5');
+  final _durationController = TextEditingController();
+  final _requirementsController = TextEditingController();
+  final _benefitsController = TextEditingController();
+
+  bool get _isEditing => widget.existingOpportunity != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isEditing) {
+      final opp = widget.existingOpportunity!;
+      _roleNameController.text = opp.roleName;
+      _capacityController.text = opp.capacity.toString();
+      _durationController.text = opp.duration ?? '';
+      _requirementsController.text = opp.requirements ?? '';
+      _benefitsController.text = opp.benefits ?? '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _roleNameController.dispose();
+    _capacityController.dispose();
+    _durationController.dispose();
+    _requirementsController.dispose();
+    _benefitsController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) return;
+
+    final opportunity = VolunteerOpportunity(
+      id: _isEditing
+          ? widget.existingOpportunity!.id
+          : OrganizerStorageService.generateId('vol'),
+      roleName: _roleNameController.text.trim(),
+      capacity: int.parse(_capacityController.text),
+      duration: _durationController.text.trim().isEmpty
+          ? null
+          : _durationController.text.trim(),
+      requirements: _requirementsController.text.trim().isEmpty
+          ? null
+          : _requirementsController.text.trim(),
+      benefits: _benefitsController.text.trim().isEmpty
+          ? null
+          : _benefitsController.text.trim(),
+      status: _isEditing
+          ? widget.existingOpportunity!.status
+          : OpportunityStatus.draft,
+    );
+
+    widget.onAdd(opportunity);
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                _isEditing ? 'Edit Volunteer Role' : 'Add Volunteer Role',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 20),
+              TextFormField(
+                controller: _roleNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Role Name *',
+                  hintText: 'e.g., Registration Desk, Technical Support',
+                ),
+                validator: (v) =>
+                    v?.trim().isEmpty ?? true ? 'Role name is required' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _capacityController,
+                decoration: const InputDecoration(
+                  labelText: 'Number of Spots *',
+                  hintText: 'How many volunteers needed',
+                ),
+                keyboardType: TextInputType.number,
+                validator: (v) {
+                  if (v?.isEmpty ?? true) return 'Capacity is required';
+                  final capacity = int.tryParse(v!);
+                  if (capacity == null || capacity < 1) {
+                    return 'Must be at least 1';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _durationController,
+                decoration: const InputDecoration(
+                  labelText: 'Time / Duration (optional)',
+                  hintText: 'e.g., 9:00 AM – 2:00 PM',
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _requirementsController,
+                decoration: const InputDecoration(
+                  labelText: 'Requirements (optional)',
+                  hintText: 'Any skills or experience needed',
+                ),
+                maxLines: 2,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _benefitsController,
+                decoration: const InputDecoration(
+                  labelText: 'Benefits (optional)',
+                  hintText: 'What volunteers receive',
+                ),
+                maxLines: 2,
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _submit,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: AppTheme.accentColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(_isEditing ? 'Save Changes' : 'Add Role'),
                 ),
               ),
             ],

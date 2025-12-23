@@ -538,6 +538,9 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   void _continueAsGuest() {
+    // Enable guest mode
+    AuthHelper.setGuestMode();
+
     final completed = widget.onCompleted;
     if (completed != null) {
       completed(context);

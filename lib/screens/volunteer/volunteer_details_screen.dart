@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../services/volunteer_api_service.dart';
 import '../../theme/app_theme.dart';
 import '../../config.dart';
+import '../../widgets/login_prompt.dart';
 
 class VolunteerDetailsScreen extends StatefulWidget {
   final int eventId;
@@ -58,9 +59,13 @@ class _VolunteerDetailsScreenState extends State<VolunteerDetailsScreen> {
   }
 
   Future<void> _applyAsVolunteer() async {
-    // Check if user is logged in
-    if (AuthHelper.token == null) {
-      _showLoginRequiredDialog();
+    // Check if user is guest or not logged in
+    if (AuthHelper.isGuest || !AuthHelper.isAuthenticated) {
+      await showLoginPrompt(
+        context,
+        title: 'Apply as Volunteer',
+        message: 'Please log in or create an account to apply as a volunteer for this event.',
+      );
       return;
     }
 
@@ -102,44 +107,6 @@ class _VolunteerDetailsScreenState extends State<VolunteerDetailsScreen> {
         _loadRoleDetails();
       }
     }
-  }
-
-  void _showLoginRequiredDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.login, color: AppTheme.primaryColor),
-            SizedBox(width: 12),
-            Text('Login Required'),
-          ],
-        ),
-        content: const Text(
-          'You need to be logged in to apply as a volunteer. Please login or create an account first.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Navigate to login screen if needed
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text('Login', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
   }
 
   @override

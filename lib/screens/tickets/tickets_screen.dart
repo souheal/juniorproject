@@ -6,6 +6,8 @@ import '../../models/ticket_dto.dart';
 import '../../services/tickets_api_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/shimmer_loading.dart';
+import '../../widgets/login_prompt.dart';
+import '../../config.dart';
 
 /// Main Tickets Screen with tabs for My Tickets and Scan Ticket (organizer).
 ///
@@ -65,6 +67,15 @@ class _TicketsScreenState extends State<TicketsScreen>
   }
 
   Future<void> _loadTickets() async {
+    // For guest users, don't try to load tickets - show empty state
+    if (AuthHelper.isGuest) {
+      setState(() {
+        _tickets = [];
+        _isLoadingTickets = false;
+      });
+      return;
+    }
+
     setState(() {
       _isLoadingTickets = true;
       _ticketsError = null;
@@ -907,7 +918,17 @@ class _TicketsScreenState extends State<TicketsScreen>
     );
   }
 
-  void _showBuyTicketDialog() {
+  void _showBuyTicketDialog() async {
+    // Check if user is guest
+    if (AuthHelper.isGuest) {
+      await showLoginPrompt(
+        context,
+        title: 'Buy Tickets',
+        message: 'Please log in or create an account to purchase tickets.',
+      );
+      return;
+    }
+
     _loadAvailableEvents();
 
     showModalBottomSheet(

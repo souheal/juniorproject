@@ -25,9 +25,9 @@ class AdminController extends Controller
         $pendingRequests = OrganizerRequest::where('status', 'pending')->count();
 
         // Calculate revenue from tickets
-        $totalRevenue = Ticket::where('status', 'confirmed')
+        $totalRevenue = Ticket::where('payment_status', 'paid')
             ->join('events', 'tickets.event_id', '=', 'events.id')
-            ->sum('events.ticket_price');
+            ->sum('events.price');
 
         // Recent organizer requests
         $recentRequests = OrganizerRequest::with('user:id,name,email')
@@ -43,15 +43,15 @@ class AdminController extends Controller
             ]);
 
         // Recent events
-        $recentEvents = Event::with('user:id,name')
+        $recentEvents = Event::with('organizer:id,name')
             ->orderByDesc('created_at')
             ->limit(5)
             ->get()
             ->map(fn($e) => [
                 'id' => $e->id,
-                'name' => $e->title,
-                'organizer' => $e->user->name ?? 'Unknown',
-                'date' => $e->start_date,
+                'name' => $e->name,
+                'organizer' => $e->organizer->name ?? 'Unknown',
+                'date' => $e->start_time,
                 'status' => $e->status ?? 'published',
             ]);
 
@@ -139,13 +139,13 @@ class AdminController extends Controller
      */
     public function events(Request $request)
     {
-        $query = Event::with('user:id,name');
+        $query = Event::with('organizer:id,name');
 
         // Search filter
         if ($request->has('search') && $request->search) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('title', 'ilike', "%{$search}%")
+                $q->where('name', 'ilike', "%{$search}%")
                   ->orWhere('location', 'ilike', "%{$search}%");
             });
         }
@@ -157,17 +157,17 @@ class AdminController extends Controller
 
         $events = $query->orderByDesc('created_at')->get()->map(fn($e) => [
             'id' => $e->id,
-            'name' => $e->title,
-            'organizer' => $e->user->name ?? 'Unknown',
-            'organizer_id' => $e->user_id,
-            'date' => $e->start_date,
-            'end_date' => $e->end_date,
+            'name' => $e->name,
+            'organizer' => $e->organizer->name ?? 'Unknown',
+            'organizer_id' => $e->organizer_id,
+            'date' => $e->start_time,
+            'end_date' => $e->end_time,
             'location' => $e->location,
             'status' => $e->status ?? 'published',
-            'ticket_price' => $e->ticket_price,
-            'max_attendees' => $e->max_attendees,
-            'tickets_sold' => $e->tickets()->where('status', 'confirmed')->count(),
-            'image' => $e->image,
+            'ticket_price' => $e->price,
+            'max_attendees' => $e->capacity,
+            'tickets_sold' => $e->tickets()->where('payment_status', 'paid')->count(),
+            'image' => $e->picture,
             'created_at' => $e->created_at,
         ]);
 
@@ -249,15 +249,15 @@ class AdminController extends Controller
 
             // Get events for approved organizers
             if ($r->status === 'approved' && $r->user) {
-                $events = Event::where('user_id', $r->user->id)
+                $events = Event::where('organizer_id', $r->user->id)
                     ->get()
                     ->map(fn($e) => [
                         'id' => $e->id,
-                        'title' => $e->title,
-                        'date' => $e->start_date,
+                        'title' => $e->name,
+                        'date' => $e->start_time,
                         'location' => $e->location,
-                        'attendees' => $e->max_attendees ?? 0,
-                        'tickets_sold' => $e->tickets()->where('status', 'confirmed')->count(),
+                        'attendees' => $e->capacity ?? 0,
+                        'tickets_sold' => $e->tickets()->where('payment_status', 'paid')->count(),
                         'status' => $e->status ?? 'published',
                     ]);
                 $data['events'] = $events;

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../models/event_model.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/login_prompt.dart';
+import '../../config.dart';
 
 class EventDetailsScreen extends StatelessWidget {
   final EventModel event;
@@ -39,7 +41,15 @@ class EventDetailsScreen extends StatelessWidget {
                   ),
                   child: const Icon(Icons.favorite_border, color: AppTheme.secondaryColor),
                 ),
-                onPressed: () {
+                onPressed: () async {
+                  if (AuthHelper.isGuest) {
+                    await showLoginPrompt(
+                      context,
+                      title: 'Save Event',
+                      message: 'Please log in or create an account to save events to your favorites.',
+                    );
+                    return;
+                  }
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Added to favorites!')),
                   );
@@ -313,7 +323,15 @@ class EventDetailsScreen extends StatelessWidget {
               const SizedBox(width: 20),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
+                    if (AuthHelper.isGuest) {
+                      await showLoginPrompt(
+                        context,
+                        title: 'Buy Tickets',
+                        message: 'Please log in or create an account to purchase tickets for this event.',
+                      );
+                      return;
+                    }
                     _showTicketPurchaseDialog(context);
                   },
                   style: ElevatedButton.styleFrom(

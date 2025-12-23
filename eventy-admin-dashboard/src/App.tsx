@@ -8,7 +8,6 @@ import { Dashboard } from '@/pages/Dashboard';
 import { Users } from '@/pages/Users';
 import { Organizers } from '@/pages/Organizers';
 import { Events } from '@/pages/Events';
-import { Comments } from '@/pages/Comments';
 import { Settings } from '@/pages/Settings';
 
 function App() {
@@ -57,16 +56,6 @@ function App() {
                 <ProtectedRoute>
                   <DashboardLayout>
                     <Events />
-                  </DashboardLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/comments"
-              element={
-                <ProtectedRoute>
-                  <DashboardLayout>
-                    <Comments />
                   </DashboardLayout>
                 </ProtectedRoute>
               }

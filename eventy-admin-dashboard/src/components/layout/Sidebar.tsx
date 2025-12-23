@@ -4,7 +4,6 @@ import {
   Users,
   UserCheck,
   Calendar,
-  MessageSquare,
   Settings,
   ChevronLeft,
   ChevronRight
@@ -22,7 +21,6 @@ const navigation = [
   { name: 'Users', href: '/users', icon: Users },
   { name: 'Organizers', href: '/organizers', icon: UserCheck },
   { name: 'Events', href: '/events', icon: Calendar },
-  { name: 'Comments', href: '/comments', icon: MessageSquare },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 

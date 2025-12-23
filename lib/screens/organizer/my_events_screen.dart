@@ -359,34 +359,39 @@ class _MyEventsScreenState extends State<MyEventsScreen>
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    _buildActionChip(
-                      icon: Icons.edit_outlined,
-                      label: 'Edit',
-                      onTap: () => Navigator.push(
-                        context,
-                        SlidePageRoute(
-                          page: CreateEventScreen(eventToEdit: event),
-                        ),
-                      ).then((_) => _loadEvents()),
-                    ),
-                    const SizedBox(width: 8),
-                    _buildActionChip(
-                      icon: Icons.people_outline,
-                      label: 'Volunteers',
-                      onTap: () => Navigator.push(
-                        context,
-                        SlidePageRoute(
-                          page: EventVolunteerManagementScreen(event: event),
-                        ),
+                    Flexible(
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _buildActionChip(
+                            icon: Icons.edit_outlined,
+                            label: 'Edit',
+                            onTap: () => Navigator.push(
+                              context,
+                              SlidePageRoute(
+                                page: CreateEventScreen(eventToEdit: event),
+                              ),
+                            ).then((_) => _loadEvents()),
+                          ),
+                          _buildActionChip(
+                            icon: Icons.people_outline,
+                            label: 'Volunteers',
+                            onTap: () => Navigator.push(
+                              context,
+                              SlidePageRoute(
+                                page: EventVolunteerManagementScreen(event: event),
+                              ),
+                            ),
+                          ),
+                          _buildActionChip(
+                            icon: Icons.bar_chart_outlined,
+                            label: 'Stats',
+                            onTap: () => _showEventStats(event),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    _buildActionChip(
-                      icon: Icons.bar_chart_outlined,
-                      label: 'Stats',
-                      onTap: () => _showEventStats(event),
-                    ),
-                    const Spacer(),
                     IconButton(
                       onPressed: () => _deleteEvent(event),
                       icon: const Icon(Icons.delete_outline),

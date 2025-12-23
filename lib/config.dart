@@ -7,7 +7,7 @@ library;
 class AppConfig {
   /// Base URL for all API requests
   /// Change this to your production URL when deploying
-  static const String baseUrl = 'http://10.74.241.124:8000';
+  static const String baseUrl = 'http://192.168.1.13:8000';
 
   /// API version prefix
   static const String apiPrefix = '/api';
@@ -43,24 +43,45 @@ class AppConfig {
 /// ```
 class AuthHelper {
   static String? _token;
+  static bool _isGuest = false;
 
   /// Current authentication token
   static String? get token => _token;
 
-  /// Check if user is authenticated
-  static bool get isAuthenticated => _token != null && _token!.isNotEmpty;
+  /// Check if user is in guest mode
+  static bool get isGuest => _isGuest;
+
+  /// Check if user is authenticated (not a guest and has token)
+  static bool get isAuthenticated => !_isGuest && _token != null && _token!.isNotEmpty;
 
   /// Set the authentication token
   /// Call this after successful login
   static void setToken(String? token) {
     _token = token;
+    _isGuest = false; // Clear guest mode when setting token
   }
 
   /// Clear the authentication token
   /// Call this on logout
   static void clearToken() {
     _token = null;
+    _isGuest = false;
   }
+
+  /// Enable guest mode
+  /// Call this when user chooses "Continue as Guest"
+  static void setGuestMode() {
+    _token = null;
+    _isGuest = true;
+  }
+
+  /// Exit guest mode (used before login/signup)
+  static void exitGuestMode() {
+    _isGuest = false;
+  }
+
+  /// Check if user can browse (either authenticated or guest)
+  static bool get canBrowse => isAuthenticated || _isGuest;
 
   /// Get authorization header map for API requests
   /// Returns empty map if not authenticated

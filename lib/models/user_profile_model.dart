@@ -11,7 +11,7 @@ import '../config.dart';
 ///     "email": "john@example.com",
 ///     "phone": "+1234567890",
 ///     "location": "Damascus",
-///     "picture": "http://10.74.241.124:8000/storage/users/abc123.jpg",
+///     "picture": "http://192.168.1.13:8000/storage/users/abc123.jpg",
 ///     "email_verified": true,
 ///     "notifications_enabled": true,
 ///     "account_type": "user"

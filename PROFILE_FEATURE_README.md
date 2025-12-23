@@ -69,7 +69,7 @@ Edit `lib/config.dart` to configure the API base URL:
 ```dart
 class AppConfig {
   /// Change this to your backend URL
-  static const String baseUrl = 'http://10.74.241.124:8000';
+  static const String baseUrl = 'http://192.168.1.13:8000';
   // For Android emulator: 'http://10.0.2.2:8000'
   // For iOS simulator: 'http://127.0.0.1:8000'
   // For production: 'https://your-api-domain.com'
@@ -116,7 +116,7 @@ Fetches user profile with stats and account type info.
     "email": "john@example.com",
     "phone": "+963912345678",
     "location": "Damascus",
-    "picture": "http://10.74.241.124:8000/storage/users/abc123.jpg",
+    "picture": "http://192.168.1.13:8000/storage/users/abc123.jpg",
     "email_verified": true,
     "notifications_enabled": true,
     "account_type": "user"
@@ -461,45 +461,45 @@ App settings including:
 
 ```bash
 # Get Profile
-curl -X GET http://10.74.241.124:8000/api/profile \
+curl -X GET http://192.168.1.13:8000/api/profile \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Accept: application/json"
 
 # Update Profile
-curl -X PUT http://10.74.241.124:8000/api/profile \
+curl -X PUT http://192.168.1.13:8000/api/profile \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json" \
   -d '{"name": "New Name", "phone": "+963123456789"}'
 
 # Change Password
-curl -X POST http://10.74.241.124:8000/api/profile/change-password \
+curl -X POST http://192.168.1.13:8000/api/profile/change-password \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json" \
   -d '{"current_password": "old123", "new_password": "new12345", "new_password_confirmation": "new12345"}'
 
 # Toggle Notifications
-curl -X POST http://10.74.241.124:8000/api/profile/notifications \
+curl -X POST http://192.168.1.13:8000/api/profile/notifications \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"enabled": false}'
 
 # Get Saved Events
-curl -X GET http://10.74.241.124:8000/api/profile/saved-events \
+curl -X GET http://192.168.1.13:8000/api/profile/saved-events \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Accept: application/json"
 
 # Save Event
-curl -X POST http://10.74.241.124:8000/api/events/1/save \
+curl -X POST http://192.168.1.13:8000/api/events/1/save \
   -H "Authorization: Bearer YOUR_TOKEN"
 
 # Unsave Event
-curl -X DELETE http://10.74.241.124:8000/api/events/1/save \
+curl -X DELETE http://192.168.1.13:8000/api/events/1/save \
   -H "Authorization: Bearer YOUR_TOKEN"
 
 # Delete Account
-curl -X DELETE http://10.74.241.124:8000/api/profile \
+curl -X DELETE http://192.168.1.13:8000/api/profile \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 

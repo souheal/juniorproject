@@ -769,6 +769,101 @@ class ProfileProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
   }
+
+  /// Submit an organizer request.
+  ///
+  /// [organizationName] - Name of the organization (required)
+  /// [description] - Description of the organization (required)
+  /// [documentBytes] - Optional document file bytes
+  /// [documentFileName] - Optional document file name
+  ///
+  /// Returns a [ProfileUpdateResult] with success status and message.
+  Future<ProfileUpdateResult> submitOrganizerRequest({
+    required String organizationName,
+    required String description,
+    List<int>? documentBytes,
+    String? documentFileName,
+  }) async {
+    if (!AuthHelper.isAuthenticated) {
+      return ProfileUpdateResult(
+        success: false,
+        message: 'Please log in to submit an organizer request.',
+      );
+    }
+
+    _isSaving = true;
+    notifyListeners();
+
+    try {
+      final response = await ApiClient.submitOrganizerRequest(
+        organizationName: organizationName,
+        description: description,
+        documentBytes: documentBytes,
+        documentFileName: documentFileName,
+      );
+
+      _isSaving = false;
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        // Refresh profile to get updated account_type info
+        await fetchProfile();
+        notifyListeners();
+        return ProfileUpdateResult(
+          success: true,
+          message: 'Your organizer request has been submitted successfully.',
+        );
+      } else if (response.statusCode == 403) {
+        final data = json.decode(response.body);
+        notifyListeners();
+        return ProfileUpdateResult(
+          success: false,
+          message: data['message'] ?? 'Only normal users can submit organizer requests.',
+        );
+      } else if (response.statusCode == 422) {
+        final data = json.decode(response.body);
+        final errors = data['errors'] as Map<String, dynamic>?;
+        String errorMsg = 'Validation failed.';
+        if (errors != null && errors.isNotEmpty) {
+          final firstError = errors.values.first;
+          if (firstError is List && firstError.isNotEmpty) {
+            errorMsg = firstError.first.toString();
+          }
+        }
+        notifyListeners();
+        return ProfileUpdateResult(success: false, message: errorMsg);
+      } else if (response.statusCode == 401) {
+        AuthHelper.clearToken();
+        _state = ProfileState.error;
+        _errorMessage = 'Session expired. Please log in again.';
+        notifyListeners();
+        return ProfileUpdateResult(
+          success: false,
+          message: 'Session expired. Please log in again.',
+        );
+      } else {
+        final data = json.decode(response.body);
+        notifyListeners();
+        return ProfileUpdateResult(
+          success: false,
+          message: data['message'] ?? 'Failed to submit organizer request.',
+        );
+      }
+    } on SocketException {
+      _isSaving = false;
+      notifyListeners();
+      return ProfileUpdateResult(
+        success: false,
+        message: 'No internet connection. Please check your network.',
+      );
+    } catch (e) {
+      _isSaving = false;
+      notifyListeners();
+      return ProfileUpdateResult(
+        success: false,
+        message: 'An unexpected error occurred. Please try again.',
+      );
+    }
+  }
 }
 
 /// Result class for profile update operations.
