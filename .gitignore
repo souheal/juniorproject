@@ -18,6 +18,13 @@ migrate_working_dir/
 *.iws
 .idea/
 nul 
+# Large datasets
+events_working.csv
+Datasets/
+
+# Generated model artifacts
+event_matrix.csv
+user_profiles.csv
 
 # The .vscode folder contains launch configuration and tasks you configure in
 # VS Code which you may wish to be included in version control, so this line
