@@ -38,6 +38,10 @@ class User extends Authenticatable
             'otp_expires_at'        => 'datetime',
             'password'              => 'hashed',
             'notifications_enabled' => 'boolean',
+
+            // Encrypted at rest (stored encrypted in DB)
+            'phone'                 => 'encrypted',
+            'location'              => 'encrypted',
         ];
     }
 
@@ -60,26 +64,6 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Role::class);
     }
-
-    // Custom notifications table (your Notification model)
-    public function notifications()
-    {
-        return $this->hasMany(Notification::class);
-    }
-
-    // Volunteer requests this user submitted
-    public function volunteerRequests()
-    {
-        return $this->hasMany(VolunteerRequest::class);
-    }
-
-    // Extra info if user is organizer
-    public function organizerProfile()
-    {
-        return $this->hasOne(OrganizerProfile::class, 'user_id');
-    }
-
-    // ========= New for profile features =========
 
     // Events the user has saved (favorites)
     public function savedEvents()
