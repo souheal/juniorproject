@@ -83,13 +83,21 @@ class OrganizerRequestAdminController extends Controller
                 $user->save();
             }
 
-            OrganizerProfile::firstOrCreate(
-                ['user_id' => $user->id],
-                [
-                    'website'  => null,
-                    'verified' => true,
-                ]
-            );
+OrganizerProfile::updateOrCreate(
+    ['user_id' => $user->id],
+    [
+        'organization_name' => $orgRequest->organization_name,
+        'description'       => $orgRequest->description,
+        'contact_email'     => $user->email,
+        'contact_phone'     => $user->phone, // optional
+        'website'           => null,
+        'facebook'          => null,
+        'instagram'         => null,
+        'twitter'           => null,
+        'verified'          => true,
+    ]
+);
+
 
             Notification::create([
                 'user_id'     => $user->id,

@@ -11,9 +11,27 @@ class OrganizerProfile extends Model
 
     protected $fillable = [
         'user_id',
+        'organization_category_id',
+        'organization_name',
+        'description',
+        'contact_email',
+        'contact_phone',
         'website',
+        'logo',
+        'facebook',
+        'instagram',
+        'twitter',
         'verified',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            // Optional but recommended: encrypt phone at rest
+            'contact_phone' => 'encrypted',
+            'verified' => 'boolean',
+        ];
+    }
 
     public function user()
     {

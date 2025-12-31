@@ -17,10 +17,12 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Middleware\HandleCors::class,
         ]);
 
-        // Register admin middleware alias
-        $middleware->alias([
-            'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
-        ]);
+        // Register admin/organizer middleware alias
+$middleware->alias([
+    'admin'     => \App\Http\Middleware\EnsureUserIsAdmin::class,
+    'organizer' => \App\Http\Middleware\EnsureUserIsOrganizer::class,
+]);
+
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

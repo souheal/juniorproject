@@ -16,6 +16,7 @@ use App\Http\Controllers\User\VolunteerRequestController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\TicketController;
 use App\Http\Controllers\Api\OrganizerEventStatsController;
+use App\Http\Controllers\Api\OrganizerProfileController;
 
 // ✅ NEW: volunteer opportunities browse endpoints
 use App\Http\Controllers\Api\VolunteerOpportunitiesController;
@@ -43,26 +44,26 @@ Route::prefix('auth')->group(function () {
 
     // Password reset
     Route::post('/password/forgot', [PasswordResetController::class, 'requestReset']);
-    Route::post('/password/reset',  [PasswordResetController::class, 'reset']);
+    Route::post('/password/verify-otp', [PasswordResetController::class, 'verifyOtp']);
+    Route::post('/password/reset', [PasswordResetController::class, 'resetPassword']);
 });
 
 // =====================
-// Public: Events + Categories (Flutter user)
+// Public routes (no login)
 // =====================
-Route::get('/events',         [PublicEventController::class, 'index']);
+
+// Public events feed / browse
+Route::get('/events', [PublicEventController::class, 'index']);
 Route::get('/events/{event}', [PublicEventController::class, 'show']);
 
+// Categories
 Route::get('/categories', [CategoryController::class, 'index']);
 
-// =====================
-// ✅ Public: Volunteer Opportunities browse
-// =====================
-Route::get('/volunteer/opportunities', [VolunteerOpportunitiesController::class, 'index']);
-Route::get('/volunteer/opportunities/{event}', [VolunteerOpportunitiesController::class, 'showEvent']);
-Route::get('/volunteer/opportunities/{event}/roles/{type}', [VolunteerOpportunitiesController::class, 'roleDetails']);
+// Volunteer opportunities browse
+Route::get('/volunteer-opportunities', [VolunteerOpportunitiesController::class, 'index']);
 
 // =====================
-// Stripe webhook (PUBLIC, بدون auth)
+// Payments Webhook (public)
 // =====================
 Route::post('/payments/stripe/webhook', [PaymentController::class, 'webhook']);
 
@@ -78,26 +79,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::put('/profile', [ProfileController::class, 'update']);
     Route::post('/profile/change-password', [ProfileController::class, 'changePassword']);
-    Route::delete('/profile', [ProfileController::class, 'deleteAccount']);
-    Route::post('/profile/notifications', [ProfileController::class, 'updateNotifications']);
-    Route::get('/profile/tickets',      [ProfileController::class, 'tickets']);
-    Route::get('/profile/saved-events', [ProfileController::class, 'savedEvents']);
-    Route::post('/events/{event}/save',   [ProfileController::class, 'saveEvent']);
-    Route::delete('/events/{event}/save', [ProfileController::class, 'unsaveEvent']);
 
-    // ---------- Organizer Request – user ----------
-    Route::post('/organizer-requests',   [OrganizerRequestController::class, 'store']);
-    Route::get('/organizer-requests/me', [OrganizerRequestController::class, 'myRequests']);
+    // ---------- Organizer request (apply to become organizer) ----------
+    Route::post('/organizer-requests', [OrganizerRequestController::class, 'store']);
+    Route::get('/organizer-requests/me', [OrganizerRequestController::class, 'myRequest']);
 
-    // ---------- Admin Dashboard ----------
-    // ADMIN ONLY: All routes in this group require admin role
+    // ---------- Admin (protected by 'admin' middleware) ----------
     Route::prefix('admin')->middleware('admin')->group(function () {
-        // Dashboard stats
+
+        // Dashboard
         Route::get('/dashboard', [AdminController::class, 'dashboard']);
 
         // Users management
-        Route::get('/users', [AdminController::class, 'users']);
-        Route::get('/users/{id}', [AdminController::class, 'showUser']);
+        Route::get('/users', [UserAdminController::class, 'index']);
+        Route::post('/users/{id}/role', [UserAdminController::class, 'updateRole']);
+        Route::delete('/users/{id}', [UserAdminController::class, 'destroy']);
 
         // Events management
         Route::get('/events', [AdminController::class, 'events']);
@@ -115,7 +111,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/notifications/{id}/read',   [NotificationController::class, 'markAsRead']);
 
     // ---------- Organizer: manage own events ----------
-    Route::prefix('organizer')->group(function () {
+    Route::prefix('organizer')->middleware('organizer')->group(function () {
+
+        // Organizer profile (view + edit)
+        Route::get('/profile', [OrganizerProfileController::class, 'show']);
+        Route::put('/profile', [OrganizerProfileController::class, 'update']);
 
         // CRUD للأحداث تبع المنظم
         Route::get('/events',      [ManageEventController::class, 'index']);

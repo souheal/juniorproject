@@ -77,4 +77,10 @@ class User extends Authenticatable
     {
         return $this->hasMany(Ticket::class);
     }
+
+    public function organizerProfile()
+{
+    return $this->hasOne(\App\Models\OrganizerProfile::class);
+}
+
 }
