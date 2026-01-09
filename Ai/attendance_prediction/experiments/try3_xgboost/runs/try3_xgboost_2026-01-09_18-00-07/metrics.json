@@ -1,0 +1,17 @@
+{
+  "test_MAE": 0.10349807695467435,
+  "test_RMSE": 0.1371724842772921,
+  "test_R2": 0.5575529675745161,
+  "test_Attendees_MAE": 11.065351483412089,
+  "model": "XGBRegressor",
+  "best_params": {
+    "model__subsample": 0.7,
+    "model__reg_lambda": 1,
+    "model__n_estimators": 600,
+    "model__min_child_weight": 1,
+    "model__max_depth": 4,
+    "model__learning_rate": 0.01,
+    "model__colsample_bytree": 0.7
+  },
+  "best_cv_score_-mae": -0.10501474558302601
+}

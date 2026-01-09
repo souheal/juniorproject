@@ -1,0 +1,14 @@
+{
+  "test_MAE": 0.05854570650060411,
+  "test_RMSE": 0.07220053900855579,
+  "test_R2": 0.8538338613635451,
+  "test_Attendees_MAE": 7.073047748460164,
+  "model": "RandomForestRegressor",
+  "best_params": {
+    "model__n_estimators": 1500,
+    "model__min_samples_leaf": 5,
+    "model__max_features": 1.0,
+    "model__max_depth": 10
+  },
+  "best_cv_score_-mae": -0.06654359588316974
+}

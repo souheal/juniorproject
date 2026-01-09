@@ -1,0 +1,9 @@
+{
+  "test_MAE": 0.10042006623417947,
+  "test_RMSE": 0.11714444178385647,
+  "test_R2": 0.6152228540681567,
+  "test_Attendees_MAE": 13.60722830485945,
+  "model": "RidgeRegression",
+  "best_alpha": 30,
+  "val_MAE": 0.10625591984715017
+}
