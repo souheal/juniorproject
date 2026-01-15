@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\VolunteerRequest;
 use App\Models\Notification;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class VolunteerRequestController extends Controller
 {
@@ -72,7 +73,6 @@ class VolunteerRequestController extends Controller
     // ======================
 
     /**
-     * user يقدّم طلب تطوّع على event معيّن
      * POST /api/events/{event}/volunteer-requests
      * Body: { "volunteer_type": "event_organizer" }
      */
@@ -87,7 +87,7 @@ class VolunteerRequestController extends Controller
 
         $type  = $data['volunteer_type'];
 
-        // ✅ لازم الدور يكون موجود ضمن volunteer_needs تبع الحدث
+        // ✅ role must exist in event.volunteer_needs
         $limit = $this->getRoleLimit($event, $type);
 
         if ($limit <= 0) {
@@ -96,7 +96,7 @@ class VolunteerRequestController extends Controller
             ], 422);
         }
 
-        // منع تكرار طلب لنفس الحدث (pending أو accepted)
+        // prevent duplicate request for same event (pending or accepted)
         $exists = VolunteerRequest::where('event_id', $event->id)
             ->where('user_id', $user->id)
             ->whereIn('status', ['pending', 'accepted'])
@@ -108,7 +108,7 @@ class VolunteerRequestController extends Controller
             ], 422);
         }
 
-        // ✅ تأكد في spots left (نحسب accepted فقط)
+        // ✅ check spots left (count accepted only)
         $accepted = $this->acceptedCount($event->id, $type);
 
         if ($accepted >= $limit) {
@@ -131,7 +131,6 @@ class VolunteerRequestController extends Controller
     }
 
     /**
-     * طلبات التطوّع الخاصة باليوزر
      * GET /api/volunteer-requests/me
      */
     public function myRequests(Request $request)
@@ -151,7 +150,6 @@ class VolunteerRequestController extends Controller
     // ======================
 
     /**
-     * كل طلبات التطوّع على أحداث هذا المنظّم
      * GET /api/organizer/volunteer-requests
      */
     public function organizerIndex(Request $request)
@@ -170,7 +168,6 @@ class VolunteerRequestController extends Controller
     }
 
     /**
-     * قبول طلب تطوّع
      * POST /api/organizer/volunteer-requests/{id}/approve
      * Body: { "reward": "..." }
      */
@@ -184,21 +181,20 @@ class VolunteerRequestController extends Controller
 
         $vr = VolunteerRequest::with('event', 'user')->findOrFail($id);
 
-        // تأكد أن الإيفنت تابع للمنظّم الحالي
+        // ensure event belongs to organizer
         if (! $vr->event || $vr->event->organizer_id !== $organizer->id) {
             return response()->json([
                 'message' => 'You can only manage volunteer requests for your own events',
             ], 403);
         }
 
-        // بس pending بينقبل
         if ($vr->status !== 'pending') {
             return response()->json([
                 'message' => 'Only pending requests can be accepted',
             ], 422);
         }
 
-        // ✅ قبل القبول، تأكد ما رح نتجاوز limit
+        // ✅ check limit before accepting
         $limit = $this->getRoleLimit($vr->event, $vr->volunteer_type);
 
         if ($limit > 0) {
@@ -210,7 +206,6 @@ class VolunteerRequestController extends Controller
                 ], 422);
             }
         } else {
-            // لو المنظم حذف role من volunteer_needs بعد ما صار في طلبات pending
             return response()->json([
                 'message' => 'This volunteer role is no longer available for this event.',
             ], 422);
@@ -218,9 +213,11 @@ class VolunteerRequestController extends Controller
 
         $vr->reward = $data['reward'];
         $vr->status = 'accepted';
+        $vr->rejection_reason = null;
+        $vr->reviewed_at = now();
+        $vr->reviewed_by = $organizer->id;
         $vr->save();
 
-        // إشعار لليوزر إنه اتقبل
         Notification::create([
             'user_id'     => $vr->user_id,
             'event_id'    => $vr->event_id,
@@ -236,7 +233,6 @@ class VolunteerRequestController extends Controller
     }
 
     /**
-     * رفض طلب تطوّع
      * POST /api/organizer/volunteer-requests/{id}/reject
      * Body: { "reason": "..." }
      */
@@ -263,9 +259,13 @@ class VolunteerRequestController extends Controller
         }
 
         $vr->status = 'rejected';
+        $vr->reward = null;
+        $vr->rejection_reason = $data['reason'] ?? null;
+        $vr->reviewed_at = now();
+        $vr->reviewed_by = $organizer->id;
         $vr->save();
 
-        $reasonText = $data['reason'] ? (' Reason: ' . $data['reason']) : '';
+        $reasonText = $vr->rejection_reason ? (' Reason: ' . $vr->rejection_reason) : '';
 
         Notification::create([
             'user_id'     => $vr->user_id,
@@ -279,5 +279,118 @@ class VolunteerRequestController extends Controller
             'message' => 'Volunteer request rejected',
             'request' => $vr->load('event:id,name', 'user:id,name,email'),
         ]);
+    }
+
+    /**
+     * GET /api/organizer/volunteer-requests/export
+     * Optional query params:
+     *   - event_id=123
+     *   - status=pending|accepted|rejected
+     *   - from=2025-01-01
+     *   - to=2025-12-31
+     */
+    public function export(Request $request)
+    {
+        $organizer = $this->requireOrganizer($request);
+
+        $data = $request->validate([
+            'event_id' => ['nullable', 'integer'],
+            'status'   => ['nullable', 'in:pending,accepted,rejected'],
+            'from'     => ['nullable', 'date'],
+            'to'       => ['nullable', 'date'],
+        ]);
+
+        $query = VolunteerRequest::query()
+            ->whereHas('event', function ($q) use ($organizer) {
+                $q->where('organizer_id', $organizer->id);
+            })
+            ->with([
+                'user:id,name,email',
+                'event:id,name,start_time,end_time,location,venue,organizer_id',
+                'reviewer:id,name,email',
+            ])
+            ->orderByDesc('created_at');
+
+        if (!empty($data['event_id'])) {
+            $query->where('event_id', $data['event_id']);
+        }
+
+        if (!empty($data['status'])) {
+            $query->where('status', $data['status']);
+        }
+
+        if (!empty($data['from'])) {
+            $query->whereDate('created_at', '>=', $data['from']);
+        }
+
+        if (!empty($data['to'])) {
+            $query->whereDate('created_at', '<=', $data['to']);
+        }
+
+        $filename = 'volunteer_requests_' . now()->format('Y-m-d_H-i-s') . '.csv';
+
+        $response = new StreamedResponse(function () use ($query) {
+            $handle = fopen('php://output', 'w');
+
+            // Excel-friendly BOM (so UTF-8 Arabic text displays correctly)
+            fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
+
+            // header row
+            fputcsv($handle, [
+                'Request ID',
+                'Event ID',
+                'Event Name',
+                'Event Start',
+                'Event End',
+                'Event Location',
+                'Event Venue',
+                'User ID',
+                'User Name',
+                'User Email',
+                'Volunteer Type',
+                'Status',
+                'Reward',
+                'Rejection Reason',
+                'Reviewed At',
+                'Reviewed By (ID)',
+                'Reviewed By (Name)',
+                'Created At',
+                'Updated At',
+            ]);
+
+            // stream rows in chunks to avoid memory issues
+            $query->chunk(500, function ($requests) use ($handle) {
+                foreach ($requests as $vr) {
+                    fputcsv($handle, [
+                        $vr->id,
+                        $vr->event_id,
+                        optional($vr->event)->name,
+                        optional($vr->event)->start_time,
+                        optional($vr->event)->end_time,
+                        optional($vr->event)->location,
+                        optional($vr->event)->venue,
+                        $vr->user_id,
+                        optional($vr->user)->name,
+                        optional($vr->user)->email,
+                        $vr->volunteer_type,
+                        $vr->status,
+                        $vr->reward,
+                        $vr->rejection_reason,
+                        optional($vr->reviewed_at)->toDateTimeString(),
+                        $vr->reviewed_by,
+                        optional($vr->reviewer)->name,
+                        $vr->created_at?->toDateTimeString(),
+                        $vr->updated_at?->toDateTimeString(),
+                    ]);
+                }
+            });
+
+            fclose($handle);
+        });
+
+        $response->headers->set('Content-Type', 'text/csv; charset=UTF-8');
+        $response->headers->set('Content-Disposition', 'attachment; filename="'.$filename.'"');
+
+        return $response;
     }
 }

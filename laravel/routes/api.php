@@ -127,9 +127,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/events/{event}/tickets',   [OrganizerEventStatsController::class, 'tickets']);
 
         // Volunteer requests على أحداثه
-        Route::get('/volunteer-requests',               [VolunteerRequestController::class, 'organizerIndex']);
-        Route::post('/volunteer-requests/{id}/approve', [VolunteerRequestController::class, 'approve']);
-        Route::post('/volunteer-requests/{id}/reject',  [VolunteerRequestController::class, 'reject']);
+        Route::get('/volunteer-requests',                [VolunteerRequestController::class, 'organizerIndex']);
+        Route::get('/volunteer-requests/export',         [VolunteerRequestController::class, 'export']); // ✅ NEW CSV EXPORT
+        Route::post('/volunteer-requests/{id}/approve',  [VolunteerRequestController::class, 'approve']);
+        Route::post('/volunteer-requests/{id}/reject',   [VolunteerRequestController::class, 'reject']);
 
         // Scan للـ QR عند الباب
         Route::post('/tickets/scan', [TicketController::class, 'scan']);
@@ -137,7 +138,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ---------- User: volunteer requests ----------
     Route::post('/events/{event}/volunteer-requests', [VolunteerRequestController::class, 'store']);
-    Route::get('/volunteer-requests/me',[VolunteerRequestController::class, 'myRequests']);
+    Route::get('/volunteer-requests/me', [VolunteerRequestController::class, 'myRequests']);
 
     // ---------- Ticketing / Payments ----------
     Route::post('/events/{event}/checkout', [PaymentController::class, 'checkout']);
