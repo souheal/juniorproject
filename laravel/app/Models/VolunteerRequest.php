@@ -15,7 +15,6 @@ class VolunteerRequest extends Model
         'social_links',
         'skills',
         'added_value',
-        'reward',
         'status',
         'rejection_reason',
         'reviewed_at',

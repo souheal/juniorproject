@@ -187,71 +187,66 @@ class VolunteerRequestController extends Controller
     /**
      * accept volunteer request
      * POST /api/organizer/volunteer-requests/{id}/approve
-     * Body: { "reward": "..." }
      */
-    public function approve(Request $request, $id)
-    {
-        $organizer = $this->requireOrganizer($request);
+public function approve(Request $request, $id)
+{
+    $organizer = $this->requireOrganizer($request);
 
-        $data = $request->validate([
-            'reward' => ['required', 'string', 'max:255'],
-        ]);
+    $vr = VolunteerRequest::with('event', 'user')->findOrFail($id);
 
-        $vr = VolunteerRequest::with('event', 'user')->findOrFail($id);
-
-        // ensure event belongs to organizer
-        if (! $vr->event || $vr->event->organizer_id !== $organizer->id) {
-            return response()->json([
-                'message' => 'You can only manage volunteer requests for your own events',
-            ], 403);
-        }
-
-        // only pending can be accepted
-        if ($vr->status !== 'pending') {
-            return response()->json([
-                'message' => 'Only pending requests can be accepted',
-            ], 422);
-        }
-
-        // check limit before accepting
-        $limit = $this->getRoleLimit($vr->event, $vr->volunteer_type);
-
-        if ($limit > 0) {
-            $accepted = $this->acceptedCount($vr->event_id, $vr->volunteer_type);
-            if ($accepted >= $limit) {
-                return response()->json([
-                    'message' => 'No spots left for this volunteer role.',
-                ], 422);
-            }
-        } else {
-            return response()->json([
-                'message' => 'This volunteer role is no longer available for this event.',
-            ], 422);
-        }
-
-        $vr->reward = $data['reward'];
-        $vr->status = 'accepted';
-
-        // If you have these columns (recommended for exports/audit)
-        if (property_exists($vr, 'reviewed_at')) $vr->reviewed_at = now();
-        if (property_exists($vr, 'reviewed_by')) $vr->reviewed_by = $organizer->id;
-        if (property_exists($vr, 'rejection_reason')) $vr->rejection_reason = null;
-
-        $vr->save();
-
-        Notification::create([
-            'user_id'     => $vr->user_id,
-            'event_id'    => $vr->event_id,
-            'type'        => 'volunteer_request_accepted',
-            'content'     => 'Your volunteer request for "' . $vr->event->name . '" has been accepted. Reward: ' . $vr->reward,
-            'read_status' => false,
-        ]);
-
+    // Ensure event belongs to organizer
+    if (! $vr->event || $vr->event->organizer_id !== $organizer->id) {
         return response()->json([
-            'message' => 'Volunteer request accepted successfully',
-            'request' => $vr->load('event:id,name', 'user:id,name,email,phone'),
-        ]);
+            'message' => 'You can only manage volunteer requests for your own events',
+        ], 403);
     }
+
+    // Only pending can be accepted
+    if ($vr->status !== 'pending') {
+        return response()->json([
+            'message' => 'Only pending requests can be accepted',
+        ], 422);
+    }
+
+    // ✅ Check limit before accepting
+    $limit = $this->getRoleLimit($vr->event, $vr->volunteer_type);
+
+    if ($limit > 0) {
+        $accepted = $this->acceptedCount($vr->event_id, $vr->volunteer_type);
+
+        if ($accepted >= $limit) {
+            return response()->json([
+                'message' => 'No spots left for this volunteer role.',
+            ], 422);
+        }
+    } else {
+        return response()->json([
+            'message' => 'This volunteer role is no longer available for this event.',
+        ], 422);
+    }
+
+    // ✅ Accept without reward
+    $vr->status = 'accepted';
+    $vr->rejection_reason = null;
+    $vr->reviewed_at = now();
+    $vr->reviewed_by = $organizer->id;
+    $vr->save();
+
+    // Notify user (no reward message)
+    Notification::create([
+        'user_id'     => $vr->user_id,
+        'event_id'    => $vr->event_id,
+        'type'        => 'volunteer_request_accepted',
+        'content'     => 'Your volunteer request for "' . $vr->event->name . '" has been accepted.',
+        'read_status' => false,
+    ]);
+
+    return response()->json([
+        'message' => 'Volunteer request accepted successfully',
+        'request' => $vr->load('event:id,name', 'user:id,name,email'),
+    ]);
+}
+
 
     /**
      * reject volunteer request
@@ -355,7 +350,6 @@ class VolunteerRequestController extends Controller
                 'Skills',
                 'Added Value',
                 'Status',
-                'Reward',
                 'Created At',
             ]);
 
@@ -376,7 +370,6 @@ class VolunteerRequestController extends Controller
                         $vr->skills,
                         $vr->added_value,
                         $vr->status,
-                        $vr->reward,
                         $vr->created_at?->toDateTimeString(),
                     ]);
                 }
