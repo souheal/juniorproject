@@ -125,6 +125,8 @@ Route::middleware('auth:sanctum')->group(function () {
         // Dashboard + tickets لكل حدث
         Route::get('/events/{event}/dashboard', [OrganizerEventStatsController::class, 'dashboard']);
         Route::get('/events/{event}/tickets',   [OrganizerEventStatsController::class, 'tickets']);
+        Route::get('/events/{event}/registrations/export', [OrganizerEventStatsController::class, 'exportRegistrations']);
+
 
         // Volunteer requests على أحداثه
         Route::get('/volunteer-requests',                [VolunteerRequestController::class, 'organizerIndex']);

@@ -10,6 +10,11 @@ class VolunteerRequest extends Model
         'event_id',
         'user_id',
         'volunteer_type',
+        'availability',
+        'previous_experience',
+        'social_links',
+        'skills',
+        'added_value',
         'reward',
         'status',
         'rejection_reason',
@@ -18,7 +23,8 @@ class VolunteerRequest extends Model
     ];
 
     protected $casts = [
-        'reviewed_at' => 'datetime',
+        'social_links' => 'array',
+        'reviewed_at'  => 'datetime',
     ];
 
     public function event()

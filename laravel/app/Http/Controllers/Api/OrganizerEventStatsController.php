@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\Ticket;
 use App\Models\VolunteerRequest;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class OrganizerEventStatsController extends Controller
 {
@@ -72,6 +73,122 @@ class OrganizerEventStatsController extends Controller
             ],
         ]);
     }
+
+    /**
+ * Export ticket holders (registrations) for an event as CSV.
+ *
+ * GET /api/organizer/events/{event}/registrations/export
+ * Optional query params:
+ *   - payment_status=pending|paid|cancelled
+ *   - scanned=0|1
+ *   - from=YYYY-MM-DD
+ *   - to=YYYY-MM-DD
+ */
+public function exportRegistrations(Request $request, $eventId)
+{
+    $organizer = $request->user();
+
+    // Ownership check: organizer can only export their own event
+    $event = Event::findOrFail($eventId);
+
+    if ((int) $event->organizer_id !== (int) $organizer->id) {
+        return response()->json([
+            'message' => 'You can only export registrations for your own events.',
+        ], 403);
+    }
+
+    $data = $request->validate([
+        'payment_status' => ['nullable', 'in:pending,paid,cancelled'],
+        'scanned'        => ['nullable', 'in:0,1'],
+        'from'           => ['nullable', 'date'],
+        'to'             => ['nullable', 'date'],
+    ]);
+
+    $query = Ticket::query()
+        ->where('event_id', $event->id)
+        ->with([
+            'user:id,name,email',
+            'event:id,name,start_time,end_time,location,venue,organizer_id',
+        ])
+        ->orderByDesc('created_at');
+
+    // Default behavior (recommended):
+    // If organizer does not specify payment_status, export only PAID tickets
+    if (!isset($data['payment_status'])) {
+        $query->where('payment_status', 'paid');
+    } else {
+        $query->where('payment_status', $data['payment_status']);
+    }
+
+    // Filter scanned tickets if requested
+    if (isset($data['scanned'])) {
+        $query->where('is_scanned', (bool) ((int) $data['scanned']));
+    }
+
+    // Date range filter by ticket creation date
+    if (!empty($data['from'])) {
+        $query->whereDate('created_at', '>=', $data['from']);
+    }
+    if (!empty($data['to'])) {
+        $query->whereDate('created_at', '<=', $data['to']);
+    }
+
+    $filename = 'event_'.$event->id.'_registrations_' . now()->format('Y-m-d_H-i-s') . '.csv';
+
+    return new StreamedResponse(function () use ($query, $event) {
+        $handle = fopen('php://output', 'w');
+
+        // UTF-8 BOM for Excel (Arabic-safe)
+        fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
+
+        // Header row
+        fputcsv($handle, [
+            'Ticket ID',
+            'Event ID',
+            'Event Name',
+            'Event Start',
+            'Event End',
+            'Location',
+            'Venue',
+            'User ID',
+            'User Name',
+            'User Email',
+            'Payment Status',
+            'Is Scanned',
+            'Scanned At',
+            'QR Code',
+            'Created At',
+        ]);
+
+        $query->chunk(500, function ($tickets) use ($handle) {
+            foreach ($tickets as $t) {
+                fputcsv($handle, [
+                    $t->id,
+                    $t->event_id,
+                    optional($t->event)->name,
+                    optional($t->event)->start_time,
+                    optional($t->event)->end_time,
+                    optional($t->event)->location,
+                    optional($t->event)->venue,
+                    $t->user_id,
+                    optional($t->user)->name,
+                    optional($t->user)->email,
+                    $t->payment_status,
+                    $t->is_scanned ? 'YES' : 'NO',
+                    $t->scanned_at,
+                    $t->qr_code,
+                    $t->created_at?->toDateTimeString(),
+                ]);
+            }
+        });
+
+        fclose($handle);
+    }, 200, [
+        'Content-Type' => 'text/csv; charset=UTF-8',
+        'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+    ]);
+}
+
 
     /**
      * قائمة تذاكر حدث معيّن (للمنظم).

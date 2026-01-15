@@ -20,15 +20,15 @@ class Ticket extends Model
         'scanned_at' => 'datetime',
     ];
 
-    public function event()
-    {
-        return $this->belongsTo(Event::class);
-    }
+public function user()
+{
+    return $this->belongsTo(\App\Models\User::class);
+}
 
-    public function user()
-    {
-        return $this->belongsTo(User::class);
-    }
+public function event()
+{
+    return $this->belongsTo(\App\Models\Event::class);
+}
 
     public function payment()
     {
