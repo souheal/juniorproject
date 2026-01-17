@@ -61,7 +61,7 @@ class PublicEventController extends Controller
 
     public function show(Event $event)
     {
-        // ✅ ما نطلع draft للناس
+        //  ما نطلع draft للناس
         if ($event->status !== 'published') {
             return response()->json(['message' => 'Event not found.'], 404);
         }

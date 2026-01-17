@@ -13,8 +13,6 @@ class EnsureUserIsAdmin
      *
      * Ensures that the authenticated user has admin role.
      * Returns 403 Forbidden if user is not an admin.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {

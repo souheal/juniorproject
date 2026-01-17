@@ -16,7 +16,6 @@ class OrganizerProfileController extends Controller
         $profile = $user->organizerProfile;
 
         if (!$profile) {
-            // Should exist after approval, but we guard anyway.
             $profile = OrganizerProfile::create([
                 'user_id' => $user->id,
                 'verified' => false,

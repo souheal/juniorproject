@@ -25,7 +25,7 @@ return new class extends Migration
             $table->timestamp('predicted_at')
                   ->default(DB::raw('CURRENT_TIMESTAMP'));
 
-            // Optional actual performance fields
+            
             $table->integer('actual_attendance')->nullable();
             $table->integer('absolute_error')->nullable();
             $table->decimal('percentage_error', 5, 2)->nullable();

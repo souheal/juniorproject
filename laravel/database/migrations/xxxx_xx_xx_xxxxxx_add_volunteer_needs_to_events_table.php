@@ -8,7 +8,6 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::table('events', function (Blueprint $table) {
-            // Postgres: jsonb, MySQL: json works too
             $table->jsonb('volunteer_needs')->nullable()->after('picture');
         });
     }

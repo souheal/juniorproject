@@ -4,7 +4,6 @@ use Illuminate\Support\Facades\Route;
 // الصفحة الرئيسية
 Route::get('/', function () {
     return 'HOME OK';
-    // أو إذا بدك صفحة blade:
     // return view('welcome');
 });
 // صفحات الدفع

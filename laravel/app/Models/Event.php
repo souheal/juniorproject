@@ -25,7 +25,7 @@ class Event extends Model
     'status',
     'published_at',
     'is_live',
-    'volunteer_needs', // ✅ ADD THIS
+    'volunteer_needs',
 ];
 
 
@@ -44,7 +44,7 @@ class Event extends Model
         return $this->belongsTo(User::class, 'organizer_id');
     }
 
-    // categories (pivot: category_event)
+    // categories
     public function categories()
     {
         return $this->belongsToMany(Category::class, 'category_event');

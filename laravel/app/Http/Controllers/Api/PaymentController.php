@@ -25,7 +25,7 @@ class PaymentController extends Controller
     {
         $user = $request->user();
 
-        // الحدث بدأ أو خلص؟
+        // الحدث بدأ أو خلص
         if ($event->start_time < now()) {
             return response()->json([
                 'message' => 'Event already started or finished.',
@@ -37,7 +37,7 @@ class PaymentController extends Controller
             ->where('payment_status', 'paid')
             ->count();
 
-        // ✅ حجز مؤقت: pending آخر 15 دقيقة نحسبه ضمن السعة
+        // حجز مؤقت
         $pendingHoldCount = Ticket::where('event_id', $event->id)
             ->where('payment_status', 'pending')
             ->where('created_at', '>=', now()->subMinutes(15))
@@ -119,7 +119,7 @@ class PaymentController extends Controller
                 'error'    => $e->getMessage(),
             ]);
 
-            // فشل إنشاء session -> خليه cancelled للتنظيف
+    
             $payment->status = 'cancelled';
             $payment->save();
 
@@ -132,10 +132,7 @@ class PaymentController extends Controller
         }
     }
 
-    /**
-     * Webhook من Stripe
-     * POST /api/payments/stripe/webhook
-     */
+
     public function webhook(Request $request)
     {
         $payload   = $request->getContent();
@@ -175,19 +172,19 @@ class PaymentController extends Controller
                 return response()->json(['received' => true]);
             }
 
-            // ✅ حماية من التكرار
+            //  حماية من التكرار
             if ($ticket->payment_status === 'paid' || $payment->status === 'completed') {
                 return response()->json(['received' => true]);
             }
 
-            // ✅ علّمهم مدفوع/مكتمل
+            //  علّمهم مدفوع/مكتمل
             $ticket->payment_status = 'paid';
             $ticket->save();
 
             $payment->status = 'completed';
             $payment->save();
 
-            // ✅ ايميل تأكيد (لا يكسر الويبهوك)
+            //  ايميل تأكيد 
             if ($ticket->user && $ticket->event) {
                 try {
                     Mail::to($ticket->user->email)->send(new TicketPaidMail($ticket));

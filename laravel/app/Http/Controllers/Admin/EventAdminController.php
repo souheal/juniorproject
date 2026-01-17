@@ -90,7 +90,7 @@ class EventAdminController extends Controller
             ], 422);
         }
 
-        // إذا عندك picture وتريد تحذفها من storage، اعملها هون (حسب كودك في ManageEventController)
+       
 
         $event->delete();
 

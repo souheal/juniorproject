@@ -78,7 +78,7 @@ class ProfileController extends Controller
             'picture'  => 'sometimes|nullable|string',
         ]);
 
-        // ✅ حذف القديمة قبل تخزين الجديدة
+        //  حذف القديمة قبل تخزين الجديدة
         if (array_key_exists('picture', $data)) {
             if ($data['picture']) {
                 if ($user->picture && Storage::disk('public')->exists($user->picture)) {
@@ -210,7 +210,7 @@ class ProfileController extends Controller
             $user->tokens()->delete();
         }
 
-        // (اختياري) حذف صورة البروفايل من الستوريج
+        // حذف صورة البروفايل من الستوريج
         if ($user->picture && Storage::disk('public')->exists($user->picture)) {
             Storage::disk('public')->delete($user->picture);
         }

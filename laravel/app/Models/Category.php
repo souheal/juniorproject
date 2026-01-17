@@ -19,7 +19,6 @@ class Category extends Model
         return $this->belongsToMany(Event::class, 'category_event');
     }
 
-    // Users preferences many-to-many (لو عندك جدول category_user)
     public function users()
     {
         return $this->belongsToMany(User::class, 'category_user');

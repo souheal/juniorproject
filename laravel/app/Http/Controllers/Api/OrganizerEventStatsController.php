@@ -13,7 +13,6 @@ class OrganizerEventStatsController extends Controller
 {
     /**
      * Dashboard لارقام حدث معيّن (خاص بالمنظم صاحب الحدث).
-     * GET /api/organizer/events/{event}/dashboard
      */
     public function dashboard(Request $request, Event $event)
     {
@@ -74,16 +73,9 @@ class OrganizerEventStatsController extends Controller
         ]);
     }
 
-    /**
- * Export ticket holders (registrations) for an event as CSV.
- *
- * GET /api/organizer/events/{event}/registrations/export
- * Optional query params:
- *   - payment_status=pending|paid|cancelled
- *   - scanned=0|1
- *   - from=YYYY-MM-DD
- *   - to=YYYY-MM-DD
- */
+
+ //Export ticket holders (registrations) for an event as CSV.
+
 public function exportRegistrations(Request $request, $eventId)
 {
     $organizer = $request->user();
@@ -112,7 +104,6 @@ public function exportRegistrations(Request $request, $eventId)
         ])
         ->orderByDesc('created_at');
 
-    // Default behavior (recommended):
     // If organizer does not specify payment_status, export only PAID tickets
     if (!isset($data['payment_status'])) {
         $query->where('payment_status', 'paid');
@@ -138,7 +129,7 @@ public function exportRegistrations(Request $request, $eventId)
     return new StreamedResponse(function () use ($query, $event) {
         $handle = fopen('php://output', 'w');
 
-        // UTF-8 BOM for Excel (Arabic-safe)
+        // UTF-8 BOM for Excel
         fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
 
         // Header row

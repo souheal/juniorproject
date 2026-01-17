@@ -10,23 +10,23 @@ return new class extends Migration
     {
         Schema::table('notifications', function (Blueprint $table) {
             // 1) فكّ القيود القديمة على event_id
-            $table->dropForeign(['event_id']); // Laravel يترجمها لاسم الفوريجن الصحيح
+            $table->dropForeign(['event_id']); 
 
-            // 2) نضمن إنها قابلة للـ NULL (احتياطاً)
+            // 2) نضمن إنها قابلة للـ NULL
             $table->unsignedBigInteger('event_id')->nullable()->change();
 
             // 3) نرجع نضيف foreign key بدون cascade, مع nullOnDelete
             $table->foreign('event_id')
                 ->references('id')
                 ->on('events')
-                ->nullOnDelete();  // 👈 هون السحر: ما بقا cascade delete
+                ->nullOnDelete();  
         });
     }
 
     public function down(): void
     {
         Schema::table('notifications', function (Blueprint $table) {
-            // نرجّع الوضع القديم (لو حبيت ترجع)
+            // نرجّع الوضع القديم
             $table->dropForeign(['event_id']);
 
             $table->unsignedBigInteger('event_id')->nullable(false)->change();

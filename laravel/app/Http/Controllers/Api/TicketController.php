@@ -41,11 +41,7 @@ class TicketController extends Controller
         return response()->json($data);
     }
 
-    /**
-     * مسح QR عند باب الإيفنت – مرة واحدة فقط
-     * Body: { "qr_code": "...." }
-     * المنظم فقط يقدر يستدعيه.
-     */
+  
     public function scan(Request $request)
     {
         $user = $request->user();

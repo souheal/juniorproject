@@ -13,7 +13,7 @@ return new class extends Migration
                   ->nullable()
                   ->constrained('organization_categories')
                   ->nullOnDelete()
-                  ->after('user_id'); // adjust position if needed
+                  ->after('user_id');
         });
     }
 

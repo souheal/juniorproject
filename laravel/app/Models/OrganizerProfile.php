@@ -27,7 +27,7 @@ class OrganizerProfile extends Model
     protected function casts(): array
     {
         return [
-            // Optional but recommended: encrypt phone at rest
+            //encrypt phone at rest
             'contact_phone' => 'encrypted',
             'verified' => 'boolean',
         ];

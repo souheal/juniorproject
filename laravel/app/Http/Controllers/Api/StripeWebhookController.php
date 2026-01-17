@@ -8,10 +8,7 @@ use Illuminate\Support\Facades\Log;
 
 class StripeWebhookController extends Controller
 {
-    /**
-     * هذا الويبهوك تم إلغاء استخدامه.
-     * نستخدم فقط: PaymentController@webhook
-     */
+ 
     public function handle(Request $request)
     {
         Log::warning('Deprecated StripeWebhookController endpoint called. Ignored.');

@@ -91,7 +91,7 @@ class UserAdminController extends Controller
 
         $user = User::with('role')->findOrFail($id);
 
-        // ✅ منع حذف admin (اختياري لكن أنصح فيه)
+        // preventing admin deletion
         if ($user->role && $user->role->name === 'admin') {
             return response()->json([
                 'message' => 'Cannot delete an admin user.',
@@ -115,7 +115,7 @@ class UserAdminController extends Controller
             ], 422);
         }
 
-        // إذا عندك صور مخزنة للمستخدم وتريد حذفها، اعملها هون (حسب تخزينك)
+// here we have this in case we want to delete some pics of the users 
 
         $user->delete();
 

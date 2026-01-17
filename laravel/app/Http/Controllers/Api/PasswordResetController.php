@@ -11,14 +11,7 @@ use Illuminate\Support\Facades\Mail;
 
 class PasswordResetController extends Controller
 {
-    /**
-     * Step 1: Request reset (send OTP via EMAIL)
-     *
-     * POST /api/password/forgot
-     * {
-     *   "email": "user@example.com"
-     * }
-     */
+   
     public function requestReset(Request $request)
     {
         $data = $request->validate([
@@ -27,7 +20,7 @@ class PasswordResetController extends Controller
 
         $user = User::where('email', $data['email'])->first();
 
-        // For security, don't reveal whether the email exists
+        // For security, we don't reveal whether the email exists
         if (!$user) {
             return response()->json([
                 'message' => 'If this email exists, a reset code has been sent.',
@@ -47,7 +40,7 @@ class PasswordResetController extends Controller
             'expires_at' => $expiresAt,
         ]);
 
-        // Send email - you can replace this with your Twilio email logic if you have one
+        // Send email
         try {
             Mail::raw(
                 "Your password reset code is: {$code}. It expires in 10 minutes.",
@@ -67,17 +60,7 @@ class PasswordResetController extends Controller
         ]);
     }
 
-    /**
-     * Step 2: Verify code & reset password
-     *
-     * POST /api/password/reset
-     * {
-     *   "email": "user@example.com",
-     *   "code": "123456",
-     *   "password": "newpass",
-     *   "password_confirmation": "newpass"
-     * }
-     */
+
     public function reset(Request $request)
     {
         $data = $request->validate([

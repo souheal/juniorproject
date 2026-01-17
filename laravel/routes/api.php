@@ -18,10 +18,10 @@ use App\Http\Controllers\Api\TicketController;
 use App\Http\Controllers\Api\OrganizerEventStatsController;
 use App\Http\Controllers\Api\OrganizerProfileController;
 
-// ✅ NEW: volunteer opportunities browse endpoints
+//volunteer opportunities browse endpoints
 use App\Http\Controllers\Api\VolunteerOpportunitiesController;
 
-// ✅ NEW: Admin Dashboard endpoints
+// Admin Dashboard endpoints
 use App\Http\Controllers\Admin\UserAdminController;
 use App\Http\Controllers\Admin\EventAdminController;
 

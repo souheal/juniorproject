@@ -45,9 +45,7 @@ class ManageEventController extends Controller
         return $user;
     }
 
-    /**
-     * هل الحدث شغال حالياً حسب الوقت؟
-     */
+    //is the event live or not
     protected function computeIsLive(Event $event): bool
     {
         if (!$event->start_time || !$event->end_time) {
@@ -61,13 +59,13 @@ class ManageEventController extends Controller
     }
 
     /**
-     * Attach smart fields: is_live (time-based) + full_location.
+     * is_live (time-based) + full_location.
      */
     protected function addLocationAndLiveInfo(Event $event): void
     {
         $event->is_live = $this->computeIsLive($event);
 
-        // Combine city + location for convenient display/search
+        // Combine city + location
         $pieces = array_filter([
             $event->city,
             $event->location,
@@ -77,7 +75,7 @@ class ManageEventController extends Controller
     }
 
     /**
-     * Apply addLocationAndLiveInfo on a model / collection / paginator.
+     * Apply addLocationAndLiveInfo on a model
      */
     protected function transformEvents($events)
     {
@@ -292,7 +290,7 @@ class ManageEventController extends Controller
     // ============ Delete event (Admin only) ============
     public function destroy(Request $request, $id)
     {
-        // 🟥 الأدمن فقط
+        //  الأدمن فقط
         $this->requireAdmin($request);
 
         $event = Event::findOrFail($id);

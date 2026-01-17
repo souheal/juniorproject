@@ -45,7 +45,7 @@ class AuthController extends Controller
             ], 500);
         }
 
-        // ---------- profile picture ----------
+        // profile pic
         $picturePath = null;
 
         if (!empty($validated['picture']) && $validated['picture'] !== 'null') {
@@ -79,7 +79,7 @@ class AuthController extends Controller
             }
         }
 
-        // ---------- create user ----------
+        // create user
         DB::transaction(function () use (&$user, $validated, $userRole, $picturePath) {
             $user = User::create([
                 'role_id'    => $userRole->id,
@@ -121,9 +121,7 @@ class AuthController extends Controller
         ], 201);
     }
 
-    /**
-     * Verify email using OTP code
-     */
+    // Verify email using OTP code
     public function verifyEmailCode(Request $request)
     {
         $data = $request->validate([
@@ -150,9 +148,8 @@ class AuthController extends Controller
         ]);
     }
 
-    /**
-     * Login
-     */
+    //Login
+     
     public function login(Request $request)
     {
         $data = $request->validate([
@@ -366,7 +363,7 @@ class AuthController extends Controller
 
             $eventsCount = $user->events()->count();
 
-            // ✅ إصلاح status: accepted (مو approved)
+          
             $volunteerRequestsCount = VolunteerRequest::whereHas('event', function ($q) use ($user) {
                 $q->where('organizer_id', $user->id);
             })->where('status', 'accepted')->count();

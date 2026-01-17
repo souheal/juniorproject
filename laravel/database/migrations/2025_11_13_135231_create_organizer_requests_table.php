@@ -24,7 +24,7 @@ return new class extends Migration
 
             $table->timestamps();
 
-        // خيار تصميم: طلب واحد لكل يوزر
+        // طلب واحد لكل يوزر
             $table->unique('user_id');
         });
     }

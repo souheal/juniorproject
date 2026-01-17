@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 
 class NotificationController extends Controller
 {
-    // كل إشعارات المستخدم (ممكن تضيف pagination)
+    // كل إشعارات المستخدم
     public function index(Request $request)
     {
         $user = $request->user();

@@ -18,11 +18,11 @@ return new class extends Migration
             // when event was published
             $table->timestamp('published_at')->nullable();
 
-            // city of event (optional for now)
+            // city of event 
             $table->string('city', 255)->nullable();
         });
 
-        // Add CHECK constraint for status (PostgreSQL)
+      
         DB::statement("
             ALTER TABLE events
             ADD CONSTRAINT events_status_check
