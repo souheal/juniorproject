@@ -38,7 +38,7 @@ class AdminSeeder extends Seeder
             'role_id' => $adminRole->id,
             'name' => 'Eventy Admin',
             'email' => 'admin@eventy.com',
-            'password' => Hash::make('Admin@123'), // Change this password!
+            'password' => Hash::make('Admin@123'),
             'phone' => '+1234567890',
             'location' => 'Admin Office',
             'email_verified_at' => now(),
